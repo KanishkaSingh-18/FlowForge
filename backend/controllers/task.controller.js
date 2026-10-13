@@ -233,10 +233,48 @@ export const getProjectTasks = async (req, res) => {
             .populate("createdBy", "name email")
             .populate("dependencies", "title status");
 
+        const enrichedTasks = tasks.map((task) => {
+            const unfinishedDependencies = task.dependencies.filter(
+                (dependency) => dependency.status !== "Done"
+            );
+
+            const isBlocked =
+                task.status !== "Done" &&
+                (
+                    task.manuallyBlocked ||
+                    unfinishedDependencies.length > 0
+                );
+
+            const isReadyToStart =
+                task.status === "Todo" &&
+                !task.manuallyBlocked &&
+                unfinishedDependencies.length === 0;
+
+            const isOverdue =
+                task.status !== "Done" &&
+                task.dueDate !== null &&
+                task.dueDate !== undefined &&
+                new Date(task.dueDate).getTime() < Date.now();
+
+            return {
+                ...task.toObject(),
+                isBlocked,
+                blockedBy: isBlocked
+                    ? unfinishedDependencies.map((dependency) => ({
+                        _id: dependency._id,
+                        title: dependency.title,
+                        status: dependency.status,
+                    }))
+                    : [],
+                isReadyToStart,
+                isOverdue,
+            };
+        });
+
         return res.status(200).json({
             success: true,
-            count: tasks.length,
-            tasks,
+            count: enrichedTasks.length,
+            tasks: enrichedTasks,
         });
     } catch (error) {
         console.error("Get project tasks error:", error.message);
@@ -244,6 +282,117 @@ export const getProjectTasks = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Unable to retrieve tasks",
+        });
+    }
+};
+
+export const getProjectDashboard = async (req, res) => {
+    try {
+        const { projectId } = req.params;
+
+        if (!mongoose.isValidObjectId(projectId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid project ID",
+            });
+        }
+
+        const project = await Project.findById(projectId);
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: "Project not found",
+            });
+        }
+
+        if (!isProjectMember(project, req.userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not a member of this project",
+            });
+        }
+
+        const tasks = await Task.find({ project: projectId })
+            .select("status dueDate manuallyBlocked dependencies")
+            .populate("dependencies", "status");
+
+        const now = Date.now();
+
+        const summary = {
+            totalTasks: tasks.length,
+            todo: 0,
+            inProgress: 0,
+            completed: 0,
+            blocked: 0,
+            readyToStart: 0,
+            overdue: 0,
+        };
+
+        for (const task of tasks) {
+            const unfinishedDependencies = task.dependencies.filter(
+                (dependency) => dependency.status !== "Done"
+            );
+
+            const isBlocked =
+                task.status !== "Done" &&
+                (
+                    task.manuallyBlocked ||
+                    unfinishedDependencies.length > 0
+                );
+
+            const isReadyToStart =
+                task.status === "Todo" &&
+                !task.manuallyBlocked &&
+                unfinishedDependencies.length === 0;
+
+            const isOverdue =
+                task.status !== "Done" &&
+                task.dueDate != null &&
+                new Date(task.dueDate).getTime() < now;
+
+            if (task.status === "Todo") {
+                summary.todo++;
+            } else if (task.status === "In Progress") {
+                summary.inProgress++;
+            } else if (task.status === "Done") {
+                summary.completed++;
+            }
+
+            if (isBlocked) {
+                summary.blocked++;
+            }
+
+            if (isReadyToStart) {
+                summary.readyToStart++;
+            }
+
+            if (isOverdue) {
+                summary.overdue++;
+            }
+        }
+
+        summary.completionRate =
+            summary.totalTasks === 0
+                ? 0
+                : Math.round(
+                    (summary.completed / summary.totalTasks) * 100
+                );
+
+        return res.status(200).json({
+            success: true,
+            project: {
+                _id: project._id,
+                name: project.name,
+            },
+            summary,
+        });
+    } catch (error) {
+        console.error("Get project dashboard error:", error.message);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to retrieve project dashboard",
         });
     }
 };
