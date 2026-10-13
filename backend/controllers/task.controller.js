@@ -202,3 +202,295 @@ export const getProjectTasks = async (req, res) => {
         });
     }
 };
+
+export const updateTask = async (req, res) => {
+    try {
+        const { projectId, taskId } = req.params;
+
+        const {
+            title,
+            description,
+            assignedTo,
+            status,
+            priority,
+            dueDate,
+            manuallyBlocked,
+        } = req.body;
+
+        if (
+            !mongoose.isValidObjectId(projectId) ||
+            !mongoose.isValidObjectId(taskId)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid project or task ID",
+            });
+        }
+
+        const project = await Project.findById(projectId);
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: "Project not found",
+            });
+        }
+
+        if (!isProjectMember(project, req.userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not a member of this project",
+            });
+        }
+
+        const task = await Task.findOne({
+            _id: taskId,
+            project: projectId,
+        });
+
+        if (!task) {
+            return res.status(404).json({
+                success: false,
+                message: "Task not found in this project",
+            });
+        }
+
+        const updates = {};
+
+        if (title !== undefined) {
+            if (typeof title !== "string" || !title.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Task title cannot be empty",
+                });
+            }
+
+            updates.title = title.trim();
+        }
+
+        if (description !== undefined) {
+            if (typeof description !== "string") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Description must be a string",
+                });
+            }
+
+            updates.description = description.trim();
+        }
+
+        if (assignedTo !== undefined) {
+            if (assignedTo === null || assignedTo === "") {
+                updates.assignedTo = null;
+            } else {
+                if (!mongoose.isValidObjectId(assignedTo)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Invalid assignee ID",
+                    });
+                }
+
+                const isAssigneeMember = project.members.some(
+                    (member) =>
+                        member.user.toString() === assignedTo
+                );
+
+                if (!isAssigneeMember) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Assignee must be a project member",
+                    });
+                }
+
+                updates.assignedTo = assignedTo;
+            }
+        }
+
+        if (status !== undefined) {
+            const allowedStatuses = [
+                "Todo",
+                "In Progress",
+                "Done",
+            ];
+
+            if (!allowedStatuses.includes(status)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid task status",
+                });
+            }
+
+            updates.status = status;
+        }
+
+        if (priority !== undefined) {
+            const allowedPriorities = [
+                "Low",
+                "Medium",
+                "High",
+            ];
+
+            if (!allowedPriorities.includes(priority)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid task priority",
+                });
+            }
+
+            updates.priority = priority;
+        }
+
+        if (dueDate !== undefined) {
+            if (dueDate === null || dueDate === "") {
+                updates.dueDate = null;
+            } else {
+                const parsedDate = new Date(dueDate);
+
+                if (
+                    typeof dueDate !== "string" ||
+                    Number.isNaN(parsedDate.getTime())
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Invalid due date",
+                    });
+                }
+
+                updates.dueDate = parsedDate;
+            }
+        }
+
+        if (manuallyBlocked !== undefined) {
+            if (typeof manuallyBlocked !== "boolean") {
+                return res.status(400).json({
+                    success: false,
+                    message: "manuallyBlocked must be a boolean",
+                });
+            }
+
+            updates.manuallyBlocked = manuallyBlocked;
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No valid updates provided",
+            });
+        }
+
+        const wasDone = task.status === "Done";
+
+        Object.assign(task, updates);
+        await task.save();
+
+        const action =
+            !wasDone && task.status === "Done"
+                ? "TASK_COMPLETED"
+                : "TASK_UPDATED";
+
+        await Activity.create({
+            project: project._id,
+            actor: req.userId,
+            task: task._id,
+            action,
+            details: `Updated task: ${task.title}`,
+        });
+
+        await task.populate([
+            { path: "assignedTo", select: "name email" },
+            { path: "createdBy", select: "name email" },
+            { path: "dependencies", select: "title status" },
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            message: "Task updated successfully",
+            task,
+        });
+    } catch (error) {
+        console.error("Update task error:", error.message);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to update task",
+        });
+    }
+};
+
+export const deleteTask = async (req, res) => {
+    try {
+        const { projectId, taskId } = req.params;
+
+        if (
+            !mongoose.isValidObjectId(projectId) ||
+            !mongoose.isValidObjectId(taskId)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid project or task ID",
+            });
+        }
+
+        const project = await Project.findById(projectId);
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: "Project not found",
+            });
+        }
+
+        if (!isProjectMember(project, req.userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not a member of this project",
+            });
+        }
+
+        const task = await Task.findOne({
+            _id: taskId,
+            project: projectId,
+        });
+
+        if (!task) {
+            return res.status(404).json({
+                success: false,
+                message: "Task not found in this project",
+            });
+        }
+
+        const deletedTitle = task.title;
+
+        await Task.updateMany(
+            {
+                project: projectId,
+                dependencies: task._id,
+            },
+            {
+                $pull: { dependencies: task._id },
+            }
+        );
+
+        await task.deleteOne();
+
+        await Activity.create({
+            project: project._id,
+            actor: req.userId,
+            task: null,
+            action: "TASK_DELETED",
+            details: `Deleted task: ${deletedTitle}`,
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Task deleted successfully",
+        });
+    } catch (error) {
+        console.error("Delete task error:", error.message);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to delete task",
+        });
+    }
+};

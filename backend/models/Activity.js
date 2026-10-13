@@ -30,6 +30,7 @@ const activitySchema = new mongoose.Schema(
                 "TASK_CREATED",
                 "TASK_UPDATED",
                 "TASK_COMPLETED",
+                "TASK_DELETED",
                 "DEPENDENCY_UPDATED",
             ],
         },
