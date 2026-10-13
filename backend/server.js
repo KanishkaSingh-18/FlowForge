@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import memberRoutes from "./routes/member.routes.js";
 import taskRoutes from "./routes/task.routes.js";
+import activityRoutes from "./routes/activity.routes.js";
 
 dotenv.config();
 
@@ -24,7 +25,8 @@ app.use(cookieParser());
 app.use("/users", authRoutes);
 app.use("/projects", projectRoutes);
 app.use("/projects", memberRoutes);
-app.use("/projects", taskRoutes);  
+app.use("/projects", taskRoutes); 
+app.use("/projects", activityRoutes); 
 
 app.get("/", (req, res) => {
     res.status(200).json({
