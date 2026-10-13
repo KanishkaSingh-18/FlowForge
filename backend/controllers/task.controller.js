@@ -22,10 +22,20 @@ export const createTask = async (req, res) => {
 
         const { projectId } = req.params;
 
-        if (typeof title !== "string" || !title.trim()) {
+        if (
+            typeof title !== "string" ||
+            !title.trim()
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "Task title is required",
+            });
+        }
+
+        if (!mongoose.isValidObjectId(projectId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid project ID",
             });
         }
 
@@ -58,7 +68,8 @@ export const createTask = async (req, res) => {
             }
 
             const isAssigneeMember = project.members.some(
-                (member) => member.user.toString() === assignedTo
+                (member) =>
+                    member.user.toString() === assignedTo.toString()
             );
 
             if (!isAssigneeMember) {
@@ -67,6 +78,16 @@ export const createTask = async (req, res) => {
                     message: "Assignee must be a project member",
                 });
             }
+        }
+
+        if (
+            description !== undefined &&
+            typeof description !== "string"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Description must be a string",
+            });
         }
 
         const allowedPriorities = ["Low", "Medium", "High"];
@@ -82,12 +103,26 @@ export const createTask = async (req, res) => {
         if (
             dueDate !== undefined &&
             dueDate !== null &&
-            dueDate !== "" &&
-            Number.isNaN(Date.parse(dueDate))
+            dueDate !== ""
+        ) {
+            if (
+                typeof dueDate !== "string" ||
+                Number.isNaN(Date.parse(dueDate))
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid due date",
+                });
+            }
+        }
+
+        if (
+            manuallyBlocked !== undefined &&
+            typeof manuallyBlocked !== "boolean"
         ) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid due date",
+                message: "manuallyBlocked must be a boolean",
             });
         }
 
@@ -105,15 +140,11 @@ export const createTask = async (req, res) => {
             });
         }
 
-        if (manuallyBlocked !== undefined &&
-            typeof manuallyBlocked !== "boolean") {
-            return res.status(400).json({
-                success: false,
-                message: "manuallyBlocked must be a boolean",
-            });
-        }
-
-        const uniqueDependencies = [...new Set(taskDependencies)];
+        const uniqueDependencies = [
+            ...new Set(
+                taskDependencies.map((id) => id.toString())
+            ),
+        ];
 
         if (uniqueDependencies.length !== taskDependencies.length) {
             return res.status(400).json({
@@ -122,15 +153,29 @@ export const createTask = async (req, res) => {
             });
         }
 
+        if (uniqueDependencies.length > 0) {
+            const dependencyTasks = await Task.find({
+                _id: { $in: uniqueDependencies },
+                project: project._id,
+            }).select("_id");
+
+            if (dependencyTasks.length !== uniqueDependencies.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Every dependency must belong to this project",
+                });
+            }
+        }
+
         const task = await Task.create({
             title: title.trim(),
-            description: description ?? "",
+            description: description?.trim() ?? "",
             project: project._id,
             assignedTo: assignedTo || null,
             createdBy: req.userId,
             priority: selectedPriority,
             dueDate: dueDate || null,
-            dependencies: [],
+            dependencies: uniqueDependencies,
             manuallyBlocked: manuallyBlocked ?? false,
         });
 
@@ -203,6 +248,51 @@ export const getProjectTasks = async (req, res) => {
     }
 };
 
+const wouldCreateDependencyCycle = async (
+    taskId,
+    dependencyIds,
+    projectId
+) => {
+    const visited = new Set();
+
+    const hasPathToTask = async (currentId) => {
+        if (currentId.toString() === taskId.toString()) {
+            return true;
+        }
+
+        if (visited.has(currentId.toString())) {
+            return false;
+        }
+
+        visited.add(currentId.toString());
+
+        const currentTask = await Task.findOne({
+            _id: currentId,
+            project: projectId,
+        }).select("dependencies");
+
+        if (!currentTask) {
+            return false;
+        }
+
+        for (const dependencyId of currentTask.dependencies) {
+            if (await hasPathToTask(dependencyId)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    for (const dependencyId of dependencyIds) {
+        if (await hasPathToTask(dependencyId)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 export const updateTask = async (req, res) => {
     try {
         const { projectId, taskId } = req.params;
@@ -215,6 +305,7 @@ export const updateTask = async (req, res) => {
             priority,
             dueDate,
             manuallyBlocked,
+            dependencies,
         } = req.body;
 
         if (
@@ -256,6 +347,7 @@ export const updateTask = async (req, res) => {
         }
 
         const updates = {};
+        let dependencyChanged = false;
 
         if (title !== undefined) {
             if (typeof title !== "string" || !title.trim()) {
@@ -292,7 +384,7 @@ export const updateTask = async (req, res) => {
 
                 const isAssigneeMember = project.members.some(
                     (member) =>
-                        member.user.toString() === assignedTo
+                        member.user.toString() === assignedTo.toString()
                 );
 
                 if (!isAssigneeMember) {
@@ -324,11 +416,7 @@ export const updateTask = async (req, res) => {
         }
 
         if (priority !== undefined) {
-            const allowedPriorities = [
-                "Low",
-                "Medium",
-                "High",
-            ];
+            const allowedPriorities = ["Low", "Medium", "High"];
 
             if (!allowedPriorities.includes(priority)) {
                 return res.status(400).json({
@@ -371,6 +459,123 @@ export const updateTask = async (req, res) => {
             updates.manuallyBlocked = manuallyBlocked;
         }
 
+        if (dependencies !== undefined) {
+            if (!Array.isArray(dependencies)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Dependencies must be an array",
+                });
+            }
+
+            const dependencyIds = [];
+
+            for (const dependencyId of dependencies) {
+                if (!mongoose.isValidObjectId(dependencyId)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Invalid dependency ID",
+                    });
+                }
+
+                dependencyIds.push(dependencyId.toString());
+            }
+
+            const uniqueDependencyIds = [
+                ...new Set(dependencyIds),
+            ];
+
+            if (uniqueDependencyIds.length !== dependencyIds.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Duplicate dependencies are not allowed",
+                });
+            }
+
+            if (uniqueDependencyIds.includes(taskId.toString())) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A task cannot depend on itself",
+                });
+            }
+
+            const dependencyTasks = await Task.find({
+                _id: { $in: uniqueDependencyIds },
+                project: projectId,
+            }).select("_id status title");
+
+            if (dependencyTasks.length !== uniqueDependencyIds.length) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "One or more dependencies do not exist in this project",
+                });
+            }
+
+            const createsCycle = await wouldCreateDependencyCycle(
+                taskId,
+                uniqueDependencyIds,
+                projectId
+            );
+
+            if (createsCycle) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Circular dependency detected. This update would create a dependency cycle.",
+                });
+            }
+
+            const currentDependencies = task.dependencies
+                .map((id) => id.toString())
+                .sort();
+
+            const nextDependencies = [...uniqueDependencyIds].sort();
+
+            dependencyChanged =
+                JSON.stringify(currentDependencies) !==
+                JSON.stringify(nextDependencies);
+
+            updates.dependencies = uniqueDependencyIds;
+        }
+
+        const effectiveStatus = updates.status ?? task.status;
+
+        const effectiveDependencies =
+            updates.dependencies ?? task.dependencies;
+
+        const shouldCheckCompletion =
+            effectiveStatus === "Done" &&
+            (updates.status === "Done" || dependencyChanged);
+
+        if (
+            shouldCheckCompletion &&
+            effectiveDependencies.length > 0
+        ) {
+            const prerequisiteTasks = await Task.find({
+                _id: { $in: effectiveDependencies },
+                project: projectId,
+            }).select("title status");
+
+            const unfinishedPrerequisites = prerequisiteTasks.filter(
+                (prerequisite) => prerequisite.status !== "Done"
+            );
+
+            if (unfinishedPrerequisites.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Cannot complete this task while its dependencies are unfinished",
+                    blockedBy: unfinishedPrerequisites.map(
+                        (prerequisite) => ({
+                            id: prerequisite._id,
+                            title: prerequisite.title,
+                            status: prerequisite.status,
+                        })
+                    ),
+                });
+            }
+        }
+
         if (Object.keys(updates).length === 0) {
             return res.status(400).json({
                 success: false,
@@ -383,10 +588,13 @@ export const updateTask = async (req, res) => {
         Object.assign(task, updates);
         await task.save();
 
-        const action =
-            !wasDone && task.status === "Done"
-                ? "TASK_COMPLETED"
-                : "TASK_UPDATED";
+        let action = "TASK_UPDATED";
+
+        if (!wasDone && task.status === "Done") {
+            action = "TASK_COMPLETED";
+        } else if (dependencyChanged) {
+            action = "DEPENDENCY_UPDATED";
+        }
 
         await Activity.create({
             project: project._id,
