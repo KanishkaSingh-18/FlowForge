@@ -3,6 +3,10 @@ import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
+import authRoutes from "./routes/auth.routes.js";
+import projectRoutes from "./routes/project.routes.js";
+import memberRoutes from "./routes/member.routes.js";
+import taskRoutes from "./routes/task.routes.js";
 
 dotenv.config();
 
@@ -17,6 +21,10 @@ app.use(
 
 app.use(express.json());
 app.use(cookieParser());
+app.use("/users", authRoutes);
+app.use("/projects", projectRoutes);
+app.use("/projects", memberRoutes);
+app.use("/projects", taskRoutes);  
 
 app.get("/", (req, res) => {
     res.status(200).json({
