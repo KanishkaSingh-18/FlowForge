@@ -16,12 +16,19 @@ const projectSchema = new mongoose.Schema(
             maxlength: 1000,
         },
 
+        type: {
+            type: String,
+            enum: ["solo", "team"],
+            default: "solo",
+            required: true,
+        },
+
         owner: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: true,
         },
-        
+
         members: [
             {
                 user: {

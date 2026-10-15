@@ -15,6 +15,24 @@ function formatDate(date) {
     })
 }
 
+function getMemberUser(member) {
+    return member?.user || member
+}
+
+function getMemberName(member) {
+    const user = getMemberUser(member)
+    return user?.name || user?.email || 'Project member'
+}
+
+function getMemberEmail(member) {
+    const user = getMemberUser(member)
+    return user?.email || ''
+}
+
+function getMemberRole(member) {
+    return member?.role || 'member'
+}
+
 function ProjectWorkspace({ project, onBack }) {
     const [tasks, setTasks] = useState([])
     const [summary, setSummary] = useState(null)
@@ -30,6 +48,15 @@ function ProjectWorkspace({ project, onBack }) {
     const [selectedDependencies, setSelectedDependencies] = useState([])
     const [savingDependencies, setSavingDependencies] = useState(false)
     const [dependencyError, setDependencyError] = useState('')
+
+    // Team member management
+    const [members, setMembers] = useState(project.members || [])
+    const [memberEmail, setMemberEmail] = useState('')
+    const [addingMember, setAddingMember] = useState(false)
+    const [memberError, setMemberError] = useState('')
+    const [memberSuccess, setMemberSuccess] = useState('')
+
+    const isTeamProject = project.type === 'team'
 
     const [form, setForm] = useState({
         title: '',
@@ -64,6 +91,10 @@ function ProjectWorkspace({ project, onBack }) {
         loadWorkspace()
     }, [loadWorkspace])
 
+    useEffect(() => {
+        setMembers(project.members || [])
+    }, [project.members, project._id])
+
     const filteredTasks = useMemo(() => {
         switch (filter) {
             case 'Todo':
@@ -80,6 +111,57 @@ function ProjectWorkspace({ project, onBack }) {
                 return tasks
         }
     }, [tasks, filter])
+
+    const handleAddMember = async (event) => {
+        event.preventDefault()
+        setMemberError('')
+        setMemberSuccess('')
+
+        const email = memberEmail.trim().toLowerCase()
+
+        if (!email) {
+            setMemberError('Please enter the member’s email address.')
+            return
+        }
+
+        setAddingMember(true)
+
+        try {
+            const response = await axiosInstance.post(
+                `/projects/${project._id}/members`,
+                { email },
+            )
+
+            const returnedMembers =
+                response.data.members || response.data.project?.members
+
+            if (returnedMembers) {
+                setMembers(returnedMembers)
+            } else {
+                // Refresh the project to get the updated member list.
+                const projectResponse = await axiosInstance.get(
+                    `/projects/${project._id}`,
+                )
+
+                const updatedProject =
+                    projectResponse.data.project || projectResponse.data
+
+                setMembers(updatedProject.members || [])
+            }
+
+            setMemberEmail('')
+            setMemberSuccess(
+                response.data.message || 'Member added successfully.',
+            )
+        } catch (err) {
+            setMemberError(
+                err.response?.data?.message ||
+                'Unable to add this member. Please try again.',
+            )
+        } finally {
+            setAddingMember(false)
+        }
+    }
 
     const handleCreateTask = async (event) => {
         event.preventDefault()
@@ -215,6 +297,14 @@ function ProjectWorkspace({ project, onBack }) {
                         {project.description ||
                             'Manage tasks, dependencies, and project progress.'}
                     </p>
+                    <span
+                        className={`project-type-badge ${isTeamProject
+                                ? 'project-type-team'
+                                : 'project-type-solo'
+                            }`}
+                    >
+                        {isTeamProject ? 'Team project' : 'Solo project'}
+                    </span>
                 </div>
 
                 <button
@@ -228,6 +318,116 @@ function ProjectWorkspace({ project, onBack }) {
                     {showForm ? 'Cancel' : '+ New task'}
                 </button>
             </div>
+
+            {isTeamProject && (
+                <section className="workspace-members">
+                    <div className="workspace-members-heading">
+                        <div>
+                            <span className="projects-eyebrow">
+                                TEAM COLLABORATION
+                            </span>
+                            <h3>Project members</h3>
+                            <p>
+                                Manage the people collaborating on this project.
+                            </p>
+                        </div>
+                        <span className="workspace-members-count">
+                            {members.length} {members.length === 1 ? 'member' : 'members'}
+                        </span>
+                    </div>
+
+                    <div className="workspace-members-list">
+                        {members.length === 0 ? (
+                            <p className="workspace-members-empty">
+                                No members found for this project.
+                            </p>
+                        ) : (
+                            members.map((member, index) => (
+                                <div
+                                    className="workspace-member"
+                                    key={
+                                        getMemberUser(member)?._id ||
+                                        getMemberEmail(member) ||
+                                        index
+                                    }
+                                >
+                                    <div className="workspace-member-avatar">
+                                        {getMemberName(member)
+                                            .charAt(0)
+                                            .toUpperCase()}
+                                    </div>
+                                    <div className="workspace-member-info">
+                                        <strong>{getMemberName(member)}</strong>
+                                        {getMemberEmail(member) && (
+                                            <span>{getMemberEmail(member)}</span>
+                                        )}
+                                    </div>
+                                    <span
+                                        className={`workspace-member-role ${getMemberRole(member) === 'owner'
+                                                ? 'owner'
+                                                : ''
+                                            }`}
+                                    >
+                                        {getMemberRole(member) === 'owner'
+                                            ? 'Owner'
+                                            : 'Member'}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <form
+                        className="workspace-add-member-form"
+                        onSubmit={handleAddMember}
+                    >
+                        <label htmlFor="member-email">
+                            Add a registered user
+                        </label>
+                        <div className="workspace-add-member-row">
+                            <input
+                                id="member-email"
+                                type="email"
+                                value={memberEmail}
+                                onChange={(event) => {
+                                    setMemberEmail(event.target.value)
+                                    setMemberError('')
+                                    setMemberSuccess('')
+                                }}
+                                placeholder="Enter their account email"
+                                required
+                            />
+                            <button
+                                className="projects-create-button"
+                                type="submit"
+                                disabled={addingMember}
+                            >
+                                {addingMember ? 'Adding...' : '+ Add member'}
+                            </button>
+                        </div>
+
+                        <p className="workspace-members-help">
+                            The person must already have a FlowForge account.
+                            Only the project owner can add members.
+                        </p>
+
+                        {memberError && (
+                            <p className="workspace-error" role="alert">
+                                {memberError}
+                            </p>
+                        )}
+
+                        {memberSuccess && (
+                            <p
+                                className="workspace-member-success"
+                                role="status"
+                            >
+                                {memberSuccess}
+                            </p>
+                        )}
+                    </form>
+                </section>
+            )}
 
             <div className="workspace-stats">
                 <div>

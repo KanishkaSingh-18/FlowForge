@@ -11,7 +11,11 @@ function Projects() {
     const [saving, setSaving] = useState(false)
     const [editingId, setEditingId] = useState(null)
     const [selectedProject, setSelectedProject] = useState(null)
-    const [form, setForm] = useState({ name: '', description: '' })
+    const [form, setForm] = useState({
+        name: '',
+        description: '',
+        type: 'solo',
+    })
     const [actionError, setActionError] = useState('')
     const [confirmDelete, setConfirmDelete] = useState(null)
     const [deleting, setDeleting] = useState(false)
@@ -38,7 +42,7 @@ function Projects() {
     }, [])
 
     const openCreateForm = () => {
-        setForm({ name: '', description: '' })
+        setForm({ name: '', description: '', type: 'solo' })
         setEditingId(null)
         setActionError('')
         setShowForm(true)
@@ -48,6 +52,7 @@ function Projects() {
         setForm({
             name: project.name || '',
             description: project.description || '',
+            type: project.type || 'solo',
         })
         setEditingId(project._id)
         setActionError('')
@@ -83,13 +88,22 @@ function Projects() {
             return
         }
 
+        if (!['solo', 'team'].includes(form.type)) {
+            setActionError('Please select a valid project type.')
+            return
+        }
+
         setSaving(true)
 
         try {
             if (editingId) {
                 const response = await axiosInstance.patch(
                     `/projects/${editingId}`,
-                    { name, description },
+                    {
+                        name,
+                        description,
+                        type: form.type,
+                    },
                 )
 
                 const updatedProject = response.data.project
@@ -111,6 +125,7 @@ function Projects() {
                 const response = await axiosInstance.post('/projects', {
                     name,
                     description,
+                    type: form.type,
                 })
 
                 setProjects((current) => [
@@ -121,7 +136,7 @@ function Projects() {
 
             setShowForm(false)
             setEditingId(null)
-            setForm({ name: '', description: '' })
+            setForm({ name: '', description: '', type: 'solo' })
         } catch (err) {
             setActionError(
                 err.response?.data?.message ||
@@ -137,7 +152,9 @@ function Projects() {
         setSelectedProject(project)
 
         try {
-            const response = await axiosInstance.get(`/projects/${project._id}`)
+            const response = await axiosInstance.get(
+                `/projects/${project._id}`,
+            )
 
             if (response.data.project) {
                 setSelectedProject(response.data.project)
@@ -283,9 +300,9 @@ function Projects() {
             ) : (
                 <div className="projects-grid">
                     {projects.map((project) => {
-                        const isOwner = Boolean(
-                            project.owner && getOwnerId(project),
-                        )
+                        const isOwner =
+                            getOwnerId(project) ===
+                            (project.owner?._id || project.owner)
 
                         return (
                             <article className="project-card" key={project._id}>
@@ -293,57 +310,68 @@ function Projects() {
                                     <div className="project-card-icon">◫</div>
 
                                     <div className="project-card-top-actions">
-                                        <span className="project-role">
-                                            {isOwner ? 'Project' : 'Shared'}
+                                        <span
+                                            className={`project-type-badge ${project.type === 'team'
+                                                    ? 'project-type-team'
+                                                    : 'project-type-solo'
+                                                }`}
+                                        >
+                                            {project.type === 'team'
+                                                ? 'Team Project'
+                                                : 'Solo Project'}
                                         </span>
 
-                                        <button
-                                            type="button"
-                                            className="project-icon-button project-edit-button"
-                                            onClick={() => openEditForm(project)}
-                                            title="Edit project"
-                                            aria-label={`Edit ${project.name}`}
-                                        >
-                                            <svg
-                                                width="18"
-                                                height="18"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="1.8"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden="true"
-                                            >
-                                                <path d="m15 5 4 4" />
-                                                <path d="M4 20l4.5-1 10.8-10.8a2.1 2.1 0 0 0-3-3L5.5 15.9 4 20Z" />
-                                            </svg>
-                                        </button>
+                                        {isOwner && (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    className="project-icon-button project-edit-button"
+                                                    onClick={() => openEditForm(project)}
+                                                    title="Edit project"
+                                                    aria-label={`Edit ${project.name}`}
+                                                >
+                                                    <svg
+                                                        width="18"
+                                                        height="18"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="1.8"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <path d="m15 5 4 4" />
+                                                        <path d="M4 20l4.5-1 10.8-10.8a2.1 2.1 0 0 0-3-3L5.5 15.9 4 20Z" />
+                                                    </svg>
+                                                </button>
 
-                                        <button
-                                            type="button"
-                                            className="project-icon-button project-delete-button"
-                                            onClick={() => setConfirmDelete(project)}
-                                            title="Delete project"
-                                            aria-label={`Delete ${project.name}`}
-                                        >
-                                            <svg
-                                                width="18"
-                                                height="18"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="1.8"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden="true"
-                                            >
-                                                <path d="M3 6h18" />
-                                                <path d="M8 6V4h8v2" />
-                                                <path d="m19 6-1 14H6L5 6" />
-                                                <path d="M10 11v5M14 11v5" />
-                                            </svg>
-                                        </button>
+                                                <button
+                                                    type="button"
+                                                    className="project-icon-button project-delete-button"
+                                                    onClick={() => setConfirmDelete(project)}
+                                                    title="Delete project"
+                                                    aria-label={`Delete ${project.name}`}
+                                                >
+                                                    <svg
+                                                        width="18"
+                                                        height="18"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="1.8"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <path d="M3 6h18" />
+                                                        <path d="M8 6V4h8v2" />
+                                                        <path d="m19 6-1 14H6L5 6" />
+                                                        <path d="M10 11v5M14 11v5" />
+                                                    </svg>
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -461,6 +489,33 @@ function Projects() {
                             <div className="projects-field-meta">
                                 <span>Optional, but useful for your team.</span>
                                 <span>{form.description.length}/1000</span>
+                            </div>
+
+                            <label htmlFor="project-type">Project type *</label>
+                            <select
+                                id="project-type"
+                                className="projects-form-select"
+                                value={form.type}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        type: event.target.value,
+                                    })
+                                }
+                                required
+                            >
+                                <option value="solo">Solo project — just me</option>
+                                <option value="team">
+                                    Team project — collaborate with others
+                                </option>
+                            </select>
+
+                            <div className="projects-field-meta">
+                                <span>
+                                    {form.type === 'solo'
+                                        ? 'Manage your personal work and dependencies.'
+                                        : 'Create a shared project and add registered members.'}
+                                </span>
                             </div>
 
                             {actionError && (

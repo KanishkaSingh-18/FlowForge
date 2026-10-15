@@ -15,12 +15,21 @@ const navigation = [
   { label: 'Activity', icon: '↗' },
 ]
 
+const EMPTY_METRICS = {
+  totalTasks: 0,
+  readyToStart: 0,
+  blocked: 0,
+}
+
 function Dashboard() {
   const [activePage, setActivePage] = useState('Dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectError, setProjectError] = useState('')
+  const [taskMetrics, setTaskMetrics] = useState(EMPTY_METRICS)
+  const [metricsLoading, setMetricsLoading] = useState(true)
+  const [metricsError, setMetricsError] = useState('')
   const [showProjectForm, setShowProjectForm] = useState(false)
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
@@ -51,6 +60,64 @@ function Dashboard() {
   useEffect(() => {
     fetchProjects()
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchTaskMetrics = async () => {
+      setMetricsLoading(true)
+      setMetricsError('')
+
+      try {
+        if (projects.length === 0) {
+          if (!cancelled) {
+            setTaskMetrics(EMPTY_METRICS)
+          }
+          return
+        }
+
+        const responses = await Promise.all(
+          projects.map((project) =>
+            axiosInstance.get(`/projects/${project._id}/dashboard`),
+          ),
+        )
+
+        const metrics = responses.reduce(
+          (total, response) => {
+            const summary = response.data.summary || {}
+
+            total.totalTasks += Number(summary.totalTasks) || 0
+            total.readyToStart += Number(summary.readyToStart) || 0
+            total.blocked += Number(summary.blocked) || 0
+
+            return total
+          },
+          { ...EMPTY_METRICS },
+        )
+
+        if (!cancelled) {
+          setTaskMetrics(metrics)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMetricsError(
+            error.response?.data?.message ||
+            'Unable to load task metrics.',
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setMetricsLoading(false)
+        }
+      }
+    }
+
+    fetchTaskMetrics()
+
+    return () => {
+      cancelled = true
+    }
+  }, [projects])
 
   const handleLogout = async () => {
     try {
@@ -90,10 +157,12 @@ function Dashboard() {
       })
 
       const newProject = response.data.project
+
       setProjects((current) => [
         newProject,
         ...current.filter((project) => project._id !== newProject._id),
       ])
+
       setProjectName('')
       setProjectDescription('')
       setShowProjectForm(false)
@@ -121,6 +190,33 @@ function Dashboard() {
     .join('')
     .slice(0, 2)
     .toUpperCase()
+
+  const metrics = [
+    {
+      label: 'Your projects',
+      value: projects.length,
+      icon: '◫',
+      tone: 'blue',
+    },
+    {
+      label: 'Total tasks',
+      value: taskMetrics.totalTasks,
+      icon: '▤',
+      tone: 'purple',
+    },
+    {
+      label: 'Ready to start',
+      value: taskMetrics.readyToStart,
+      icon: '↗',
+      tone: 'green',
+    },
+    {
+      label: 'Blocked tasks',
+      value: taskMetrics.blocked,
+      icon: '⊘',
+      tone: 'orange',
+    },
+  ]
 
   return (
     <div className="app-shell">
@@ -170,6 +266,7 @@ function Dashboard() {
                 setSidebarOpen(false)
                 setNotice('')
                 setProjectError('')
+
                 if (item.label === 'Projects') fetchProjects()
               }}
             >
@@ -310,50 +407,43 @@ function Dashboard() {
                     </span>
                   </section>
 
+                  {metricsError && (
+                    <div className="projects-error" role="alert">
+                      {metricsError}
+                      <button
+                        type="button"
+                        onClick={() => setMetricsError('')}
+                        aria-label="Dismiss metrics error"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+
                   <section className="metrics-grid">
-                    {[
-                      {
-                        label: 'Your projects',
-                        value: projects.length,
-                        icon: '◫',
-                        tone: 'blue',
-                      },
-                      {
-                        label: 'Total tasks',
-                        value: '—',
-                        icon: '▤',
-                        tone: 'purple',
-                      },
-                      {
-                        label: 'Ready to start',
-                        value: '—',
-                        icon: '↗',
-                        tone: 'green',
-                      },
-                      {
-                        label: 'Blocked tasks',
-                        value: '—',
-                        icon: '⊘',
-                        tone: 'orange',
-                      },
-                    ].map((metric) => (
-                      <article className="metric-card" key={metric.label}>
-                        <div className={`metric-icon ${metric.tone}`}>
-                          {metric.icon}
-                        </div>
-                        <span className="metric-label">{metric.label}</span>
-                        <div className="metric-value">
-                          {projectsLoading && metric.label === 'Your projects'
-                            ? '…'
-                            : metric.value}
-                        </div>
-                        <span className="metric-note">
-                          {metric.label === 'Your projects'
-                            ? 'Across your workspace'
-                            : 'Select a project to view metrics'}
-                        </span>
-                      </article>
-                    ))}
+                    {metrics.map((metric) => {
+                      const isLoading =
+                        metric.label === 'Your projects'
+                          ? projectsLoading
+                          : metricsLoading
+
+                      return (
+                        <article className="metric-card" key={metric.label}>
+                          <div className={`metric-icon ${metric.tone}`}>
+                            {metric.icon}
+                          </div>
+                          <span className="metric-label">{metric.label}</span>
+                          <div className="metric-value">
+                            {isLoading ? '…' : metric.value}
+                          </div>
+                          <span className="metric-note">
+                            {metric.label === 'Your projects'
+                              ? 'Across your workspace'
+                              : 'Across all your projects'}
+                          </span>
+                        </article>
+                      )
+                    })}
                   </section>
 
                   <section className="content-grid">
@@ -373,7 +463,9 @@ function Dashboard() {
                       </div>
 
                       {projectsLoading ? (
-                        <div className="project-message">Loading projects…</div>
+                        <div className="project-message">
+                          Loading projects…
+                        </div>
                       ) : projectError ? (
                         <div className="project-message error-message">
                           {projectError}

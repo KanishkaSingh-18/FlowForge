@@ -653,7 +653,6 @@
     text-transform: capitalize;
 }
 
-/* Responsive layout */
 @media (max-width: 800px) {
     .projects-grid {
         grid-template-columns: minmax(0, 1fr);
@@ -711,5 +710,57 @@
 
     .project-role {
         padding: 5px 8px;
+    }
+}
+
+.projects-form .projects-form-select {
+    width: 100%;
+    min-height: 42px;
+    padding: 12px 13px;
+    border: 1px solid #e5e0ef;
+    border-radius: 10px;
+    outline: none;
+    background-color: #fdfcff;
+    color: #302a49;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.projects-form .projects-form-select:focus {
+    border-color: #9888e8;
+    box-shadow: 0 0 0 3px #7965d81a;
+}
+
+.project-type-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.project-type-solo {
+    color: #b85930;
+    background: #f7e3cd;
+    border-color: #dfd2ff;
+}
+
+.project-type-team {
+    color: #087f68;
+    background: #e0f8ee;
+    border-color: #b8ead7;
+}
+
+@media (max-width: 360px) {
+    .project-type-badge {
+        padding: 5px 7px;
+        font-size: 9px;
     }
 }

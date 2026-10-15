@@ -363,7 +363,6 @@
     background: #fff;
 }
 
-/* Dependencies */
 .workspace-dependency-summary {
     margin-top: 12px;
     color: #6b7084;
@@ -467,5 +466,189 @@
 
     .workspace-progress {
         padding: 15px;
+    }
+}
+
+.workspace-members {
+    margin: 24px 0;
+    padding: 22px;
+    border: 1px solid #e9e3f5;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 5px 20px rgba(65, 45, 110, 0.04);
+}
+
+.workspace-members-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.workspace-members-heading h3 {
+    margin: 6px 0;
+    color: #302a49;
+    font-size: 18px;
+}
+
+.workspace-members-heading p {
+    margin: 0;
+    color: #827b95;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.workspace-members-count {
+    flex-shrink: 0;
+    padding: 7px 11px;
+    border-radius: 20px;
+    background: #f0eaff;
+    color: #6548bd;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.workspace-members-list {
+    display: grid;
+    gap: 10px;
+}
+
+.workspace-member {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #f0edf6;
+    border-radius: 12px;
+    background: #fdfcff;
+}
+
+.workspace-member-avatar {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 12px;
+    background: #eee8ff;
+    color: #6548bd;
+    font-size: 15px;
+    font-weight: 750;
+}
+
+.workspace-member-info {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    gap: 4px;
+}
+
+.workspace-member-info strong {
+    overflow-wrap: anywhere;
+    color: #302a49;
+    font-size: 12px;
+}
+
+.workspace-member-info span {
+    overflow-wrap: anywhere;
+    color: #827b95;
+    font-size: 11px;
+}
+
+.workspace-member-role {
+    flex-shrink: 0;
+    padding: 5px 9px;
+    border-radius: 20px;
+    background: #edf0f7;
+    color: #626b80;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.workspace-member-role.owner {
+    background: #e0f8ee;
+    color: #087f68;
+}
+
+.workspace-members-empty {
+    margin: 0;
+    color: #827b95;
+    font-size: 12px;
+}
+
+.workspace-add-member-form {
+    display: grid;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid #eeeaf5;
+}
+
+.workspace-add-member-form > label {
+    color: #413957;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.workspace-add-member-row {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.workspace-add-member-row input {
+    min-width: 0;
+    flex: 1;
+    padding: 11px 13px;
+    border: 1px solid #e5e0ef;
+    border-radius: 10px;
+    outline: none;
+    background: #fdfcff;
+    color: #302a49;
+    font: inherit;
+    font-size: 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.workspace-add-member-row input:focus {
+    border-color: #9888e8;
+    box-shadow: 0 0 0 3px #7965d81a;
+}
+
+.workspace-add-member-row button {
+    flex-shrink: 0;
+}
+
+.workspace-members-help {
+    margin: 0;
+    color: #827b95;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.workspace-member-success {
+    margin: 0;
+    color: #087f68;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+@media (max-width: 560px) {
+    .workspace-members {
+        padding: 16px;
+    }
+
+    .workspace-add-member-row {
+        flex-direction: column;
+    }
+
+    .workspace-add-member-row button {
+        width: 100%;
+    }
+
+    .workspace-member {
+        gap: 9px;
+        padding: 10px;
     }
 }
