@@ -138,10 +138,13 @@
 .projects-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
     gap: 18px;
 }
 
 .project-card {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     padding: 21px;
     border: 1px solid #ebe7f4;
@@ -162,13 +165,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 12px;
 }
 
 .project-card-icon {
     display: grid;
     width: 44px;
     height: 44px;
+    flex-shrink: 0;
     place-items: center;
     border-radius: 13px;
     background: #f0edff;
@@ -176,8 +180,69 @@
     font-size: 23px;
 }
 
+.project-card-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.project-card-top-actions .project-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid #e8e2ff;
+    border-radius: 11px;
+    background: #f5f3ff;
+    color: #7256d9;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.project-card-top-actions .project-icon-button svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.project-card-top-actions .project-edit-button:hover {
+    background: #e9e4ff;
+    transform: translateY(-1px);
+}
+
+.project-card-top-actions .project-delete-button {
+    border-color: #fecdd3;
+    background: #fff1f2;
+    color: #dc3545;
+}
+
+.project-card-top-actions .project-delete-button:hover {
+    border-color: #fda4af;
+    background: #ffe0e4;
+    transform: translateY(-1px);
+}
+
+.project-card-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 17px;
+}
+
+.project-card-title-row h3 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    margin: 0;
+    color: #302a49;
+    font-size: 17px;
+    font-weight: 750;
+}
+
 .project-role {
-    padding: 5px 9px;
+    flex-shrink: 0;
+    padding: 6px 11px;
     border-radius: 20px;
     background: #f3f1fb;
     color: #77708e;
@@ -185,19 +250,11 @@
     font-weight: 700;
 }
 
-.project-card h3 {
-    overflow-wrap: anywhere;
-    margin: 17px 0 8px;
-    color: #302a49;
-    font-size: 17px;
-    font-weight: 750;
-}
-
 .project-card-description {
     display: -webkit-box;
     overflow: hidden;
     min-height: 43px;
-    margin: 0;
+    margin: 8px 0 0;
     color: #858098;
     font-size: 12px;
     line-height: 1.8;
@@ -211,68 +268,48 @@
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 8px;
-    margin-top: 20px;
-    padding: 13px 0;
-    border-top: 1px solid #f0edf6;
+    margin-top: auto;
+    padding: 17px 0 13px;
+    border-bottom: 1px solid #f0edf6;
     color: #817b95;
     font-size: 10px;
 }
 
 .project-card-actions {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-top: 12px;
-    border-top: 1px solid #f0edf6;
+    width: 100%;
+    margin-top: 14px;
+    padding-top: 0;
 }
 
-.project-open-button {
+.project-card-actions .project-open-button {
     display: flex;
-    flex: 1;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 36px;
-    padding: 8px 12px;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    flex: 1;
+    padding: 12px 15px;
     border: 0;
-    border-radius: 9px;
+    border-radius: 11px;
     background: #f3f0ff;
     color: #6853ce;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
+    white-space: nowrap;
     cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.project-open-button:hover {
+.project-card-actions .project-open-button:hover {
     background: #eae5ff;
+    transform: translateY(-1px);
 }
 
-.project-open-button span {
+.project-card-actions .project-open-button span {
     font-size: 17px;
-}
-
-.project-icon-button {
-    display: grid;
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    place-items: center;
-    border: 1px solid #e9e5f2;
-    border-radius: 9px;
-    background: #fff;
-    color: #716b87;
-    font-size: 17px;
-    cursor: pointer;
-}
-
-.project-icon-button:hover {
-    background: #f7f5fc;
-}
-
-.project-delete-button:hover {
-    border-color: #f1cbd3;
-    background: #fff1f3;
-    color: #c83f58;
 }
 
 .projects-empty,
@@ -396,6 +433,7 @@
     cursor: pointer;
 }
 
+/* Modal */
 .projects-modal-backdrop {
     position: fixed;
     z-index: 1000;
@@ -511,6 +549,42 @@
     cursor: not-allowed;
 }
 
+.projects-confirm-modal {
+    width: min(100%, 420px);
+    text-align: center;
+}
+
+.projects-delete-symbol {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    margin: 0 auto 15px;
+    border-radius: 15px;
+    background: #fff0f1;
+    color: #c83f58;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.projects-confirm-modal h2 {
+    margin: 0 0 10px;
+    color: #302a49;
+    font-size: 20px;
+}
+
+.projects-confirm-modal p {
+    margin: 0;
+    color: #817b95;
+    font-size: 12px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+}
+
+.projects-confirm-modal .projects-form-actions {
+    justify-content: center;
+}
+
 .project-detail-info {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -579,42 +653,7 @@
     text-transform: capitalize;
 }
 
-.projects-confirm-modal {
-    width: min(100%, 420px);
-    text-align: center;
-}
-
-.projects-delete-symbol {
-    display: grid;
-    width: 48px;
-    height: 48px;
-    place-items: center;
-    margin: 0 auto 15px;
-    border-radius: 15px;
-    background: #fff0f1;
-    color: #c83f58;
-    font-size: 24px;
-    font-weight: 800;
-}
-
-.projects-confirm-modal h2 {
-    margin: 0 0 10px;
-    color: #302a49;
-    font-size: 20px;
-}
-
-.projects-confirm-modal p {
-    margin: 0;
-    color: #817b95;
-    font-size: 12px;
-    line-height: 1.8;
-    overflow-wrap: anywhere;
-}
-
-.projects-confirm-modal .projects-form-actions {
-    justify-content: center;
-}
-
+/* Responsive layout */
 @media (max-width: 800px) {
     .projects-grid {
         grid-template-columns: minmax(0, 1fr);
@@ -649,5 +688,28 @@
 
     .project-detail-info {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 360px) {
+    .project-card {
+        padding: 14px;
+    }
+
+    .project-card-top-actions {
+        gap: 6px;
+    }
+
+    .project-card-top-actions .project-icon-button {
+        width: 34px;
+        height: 34px;
+    }
+
+    .project-card-title-row {
+        gap: 8px;
+    }
+
+    .project-role {
+        padding: 5px 8px;
     }
 }

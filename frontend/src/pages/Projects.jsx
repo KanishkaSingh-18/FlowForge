@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import axiosInstance from '../api/axiosInstance'
+import ProjectWorkspace from './ProjectWorkspace'
 import './Projects.css'
 
 function Projects() {
@@ -13,6 +14,7 @@ function Projects() {
     const [form, setForm] = useState({ name: '', description: '' })
     const [actionError, setActionError] = useState('')
     const [confirmDelete, setConfirmDelete] = useState(null)
+    const [deleting, setDeleting] = useState(false)
 
     const loadProjects = async () => {
         setLoading(true)
@@ -90,17 +92,19 @@ function Projects() {
                     { name, description },
                 )
 
+                const updatedProject = response.data.project
+
                 setProjects((current) =>
                     current.map((project) =>
                         project._id === editingId
-                            ? { ...project, ...response.data.project }
+                            ? { ...project, ...updatedProject }
                             : project,
                     ),
                 )
 
                 setSelectedProject((current) =>
                     current?._id === editingId
-                        ? { ...current, ...response.data.project }
+                        ? { ...current, ...updatedProject }
                         : current,
                 )
             } else {
@@ -129,21 +133,27 @@ function Projects() {
     }
 
     const openDetails = async (project) => {
-        setSelectedProject(project)
         setActionError('')
+        setSelectedProject(project)
 
         try {
             const response = await axiosInstance.get(`/projects/${project._id}`)
-            setSelectedProject(response.data.project)
+
+            if (response.data.project) {
+                setSelectedProject(response.data.project)
+            }
         } catch (err) {
             setActionError(
                 err.response?.data?.message ||
-                'Unable to load project details.',
+                'Unable to refresh project details.',
             )
         }
     }
 
     const handleDelete = async (projectId) => {
+        if (deleting) return
+
+        setDeleting(true)
         setActionError('')
 
         try {
@@ -153,17 +163,14 @@ function Projects() {
                 current.filter((project) => project._id !== projectId),
             )
 
-            if (selectedProject?._id === projectId) {
-                setSelectedProject(null)
-            }
-
             setConfirmDelete(null)
         } catch (err) {
             setActionError(
                 err.response?.data?.message ||
                 'Unable to delete this project.',
             )
-            setConfirmDelete(null)
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -182,11 +189,16 @@ function Projects() {
             ? project.owner?._id
             : project.owner
 
-    const getMemberName = (member) => {
-        const person = member.user
-        return typeof person === 'object'
-            ? person?.name || person?.email || 'Member'
-            : 'Member'
+    if (selectedProject) {
+        return (
+            <ProjectWorkspace
+                project={selectedProject}
+                onBack={() => {
+                    setSelectedProject(null)
+                    setActionError('')
+                }}
+            />
+        )
     }
 
     return (
@@ -272,26 +284,73 @@ function Projects() {
                 <div className="projects-grid">
                     {projects.map((project) => {
                         const isOwner = Boolean(
-                            project.owner &&
-                            getOwnerId(project) &&
-                            String(getOwnerId(project)) ===
-                            String(
-                                typeof project.owner === 'object'
-                                    ? project.owner._id
-                                    : project.owner,
-                            ),
+                            project.owner && getOwnerId(project),
                         )
 
                         return (
                             <article className="project-card" key={project._id}>
                                 <div className="project-card-top">
                                     <div className="project-card-icon">◫</div>
-                                    <span className="project-role">
-                                        {isOwner ? 'Project' : 'Shared'}
-                                    </span>
+
+                                    <div className="project-card-top-actions">
+                                        <span className="project-role">
+                                            {isOwner ? 'Project' : 'Shared'}
+                                        </span>
+
+                                        <button
+                                            type="button"
+                                            className="project-icon-button project-edit-button"
+                                            onClick={() => openEditForm(project)}
+                                            title="Edit project"
+                                            aria-label={`Edit ${project.name}`}
+                                        >
+                                            <svg
+                                                width="18"
+                                                height="18"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="1.8"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                aria-hidden="true"
+                                            >
+                                                <path d="m15 5 4 4" />
+                                                <path d="M4 20l4.5-1 10.8-10.8a2.1 2.1 0 0 0-3-3L5.5 15.9 4 20Z" />
+                                            </svg>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            className="project-icon-button project-delete-button"
+                                            onClick={() => setConfirmDelete(project)}
+                                            title="Delete project"
+                                            aria-label={`Delete ${project.name}`}
+                                        >
+                                            <svg
+                                                width="18"
+                                                height="18"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="1.8"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                aria-hidden="true"
+                                            >
+                                                <path d="M3 6h18" />
+                                                <path d="M8 6V4h8v2" />
+                                                <path d="m19 6-1 14H6L5 6" />
+                                                <path d="M10 11v5M14 11v5" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <h3>{project.name}</h3>
+                                <div className="project-card-title-row">
+                                    <h3>{project.name}</h3>
+                                </div>
+
                                 <p className="project-card-description">
                                     {project.description ||
                                         'No description yet. Add one to explain what this project is about.'}
@@ -316,27 +375,8 @@ function Projects() {
                                         className="project-open-button"
                                         onClick={() => openDetails(project)}
                                     >
-                                        View details <span aria-hidden="true">→</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className="project-icon-button"
-                                        onClick={() => openEditForm(project)}
-                                        title="Edit project"
-                                        aria-label={`Edit ${project.name}`}
-                                    >
-                                        ✎
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className="project-icon-button project-delete-button"
-                                        onClick={() => setConfirmDelete(project)}
-                                        title="Delete project"
-                                        aria-label={`Delete ${project.name}`}
-                                    >
-                                        ×
+                                        Open project
+                                        <span aria-hidden="true">→</span>
                                     </button>
                                 </div>
                             </article>
@@ -403,15 +443,16 @@ function Projects() {
                                 <span>{form.name.length}/100</span>
                             </div>
 
-                            <label htmlFor="project-description">
-                                Description
-                            </label>
+                            <label htmlFor="project-description">Description</label>
                             <textarea
                                 id="project-description"
                                 placeholder="What are you building or trying to achieve?"
                                 value={form.description}
                                 onChange={(event) =>
-                                    setForm({ ...form, description: event.target.value })
+                                    setForm({
+                                        ...form,
+                                        description: event.target.value,
+                                    })
                                 }
                                 maxLength={1000}
                                 rows={4}
@@ -454,108 +495,15 @@ function Projects() {
                 </div>
             )}
 
-            {selectedProject && (
+            {confirmDelete && (
                 <div
                     className="projects-modal-backdrop"
                     onMouseDown={(event) => {
-                        if (event.target === event.currentTarget) {
-                            setSelectedProject(null)
-                            setActionError('')
+                        if (event.target === event.currentTarget && !deleting) {
+                            setConfirmDelete(null)
                         }
                     }}
                 >
-                    <section
-                        className="projects-modal project-details-modal"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="project-details-title"
-                    >
-                        <div className="projects-modal-heading">
-                            <div>
-                                <span className="projects-eyebrow">PROJECT DETAILS</span>
-                                <h2 id="project-details-title">
-                                    {selectedProject.name}
-                                </h2>
-                                <p>
-                                    {selectedProject.description ||
-                                        'No description has been added yet.'}
-                                </p>
-                            </div>
-
-                            <button
-                                type="button"
-                                className="projects-modal-close"
-                                onClick={() => {
-                                    setSelectedProject(null)
-                                    setActionError('')
-                                }}
-                                aria-label="Close details"
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        <div className="project-detail-info">
-                            <div>
-                                <span>Created</span>
-                                <strong>{formatDate(selectedProject.createdAt)}</strong>
-                            </div>
-                            <div>
-                                <span>Last updated</span>
-                                <strong>{formatDate(selectedProject.updatedAt)}</strong>
-                            </div>
-                            <div>
-                                <span>Team members</span>
-                                <strong>
-                                    {selectedProject.members?.length || 0}
-                                </strong>
-                            </div>
-                        </div>
-
-                        <div className="project-members">
-                            <h3>People in this project</h3>
-                            {selectedProject.members?.length ? (
-                                selectedProject.members.map((member, index) => (
-                                    <div
-                                        className="project-member-row"
-                                        key={member.user?._id || index}
-                                    >
-                                        <span className="project-member-avatar">
-                                            {getMemberName(member).charAt(0).toUpperCase()}
-                                        </span>
-                                        <span>{getMemberName(member)}</span>
-                                        <span className="project-member-role">
-                                            {member.role || 'member'}
-                                        </span>
-                                    </div>
-                                ))
-                            ) : (
-                                <p>No member information available.</p>
-                            )}
-                        </div>
-
-                        <div className="projects-form-actions">
-                            <button
-                                type="button"
-                                className="projects-secondary-button"
-                                onClick={() => setSelectedProject(null)}
-                            >
-                                Close
-                            </button>
-                            <button
-                                type="button"
-                                className="projects-create-button"
-                                onClick={() => openEditForm(selectedProject)}
-                            >
-                                Edit project
-                            </button>
-                        </div>
-                    </section>
-                </div>
-            )}
-
-            {confirmDelete && (
-                <div className="projects-modal-backdrop">
                     <section
                         className="projects-modal projects-confirm-modal"
                         role="alertdialog"
@@ -565,14 +513,16 @@ function Projects() {
                         <div className="projects-delete-symbol">!</div>
                         <h2 id="delete-project-title">Delete this project?</h2>
                         <p>
-                            You're about to delete <strong>{confirmDelete.name}</strong>.
-                            This action cannot be undone.
+                            You're about to delete{' '}
+                            <strong>{confirmDelete.name}</strong>. This action
+                            cannot be undone.
                         </p>
                         <div className="projects-form-actions">
                             <button
                                 type="button"
                                 className="projects-secondary-button"
                                 onClick={() => setConfirmDelete(null)}
+                                disabled={deleting}
                             >
                                 Cancel
                             </button>
@@ -580,8 +530,9 @@ function Projects() {
                                 type="button"
                                 className="projects-danger-button"
                                 onClick={() => handleDelete(confirmDelete._id)}
+                                disabled={deleting}
                             >
-                                Delete project
+                                {deleting ? 'Deleting...' : 'Delete project'}
                             </button>
                         </div>
                     </section>
