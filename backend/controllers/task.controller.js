@@ -8,6 +8,9 @@ const isProjectMember = (project, userId) =>
         (member) => member.user.toString() === userId.toString()
     );
 
+const isProjectOwner = (project, userId) =>
+    project.owner.toString() === userId.toString();
+
 export const createTask = async (req, res) => {
     try {
         const {
@@ -48,10 +51,10 @@ export const createTask = async (req, res) => {
             });
         }
 
-        if (!isProjectMember(project, req.userId)) {
+        if (!isProjectOwner(project, req.userId)) {
             return res.status(403).json({
                 success: false,
-                message: "You are not a member of this project",
+                message: "Only the project owner can create tasks",
             });
         }
 
@@ -495,6 +498,34 @@ export const updateTask = async (req, res) => {
             });
         }
 
+        const isOwner = isProjectOwner(project, req.userId);
+
+        if (!isOwner) {
+            const isAssignedMember =
+                task.assignedTo?.toString() === req.userId.toString();
+
+            if (!isAssignedMember) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You can only update tasks assigned to you",
+                });
+            }
+
+            const submittedFields = Object.keys(req.body);
+
+            const hasOnlyStatus =
+                submittedFields.length === 1 &&
+                submittedFields[0] === "status";
+
+            if (!hasOnlyStatus) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "Members can only update the status of their assigned tasks",
+                });
+            }
+        }
+
         const updates = {};
         let dependencyChanged = false;
 
@@ -797,10 +828,10 @@ export const deleteTask = async (req, res) => {
             });
         }
 
-        if (!isProjectMember(project, req.userId)) {
+        if (!isProjectOwner(project, req.userId)) {
             return res.status(403).json({
                 success: false,
-                message: "You are not a member of this project",
+                message: "Only the project owner can delete tasks",
             });
         }
 
