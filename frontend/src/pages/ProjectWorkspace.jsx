@@ -119,6 +119,14 @@ function formatActivityDate(date) {
 
 function ProjectWorkspace({ project, onBack }) {
     const { user } = useAuth()
+
+    const now = new Date()
+    const minDueDate = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0'),
+    ].join('-')
+
     const taskFormRef = useRef(null)
     const currentUserId = getId(user?._id || user?.id)
     const projectOwnerId = getId(project.owner)
@@ -259,7 +267,6 @@ function ProjectWorkspace({ project, onBack }) {
         }
     }, [tasks, filter])
 
-    // Group activities by calendar date while preserving their existing order.
     const groupedActivities = useMemo(() => {
         const groups = []
 
@@ -429,6 +436,25 @@ function ProjectWorkspace({ project, onBack }) {
         setSavingDependencies(true)
         setDependencyError('')
 
+        for (const dependencyId of selectedDependencies) {
+            const prerequisite = tasks.find(
+                (task) => task._id === dependencyId
+            )
+
+            if (
+                dependencyTask.dueDate &&
+                prerequisite?.dueDate &&
+                dependencyTask.dueDate.slice(0, 10) <
+                prerequisite.dueDate.slice(0, 10)
+            ) {
+                setDependencyError(
+                    `"${dependencyTask.title}" cannot be due before its prerequisite "${prerequisite.title}".`
+                )
+                setSavingDependencies(false)
+                return
+            }
+        }
+
         try {
             await axiosInstance.patch(
                 `/projects/${project._id}/tasks/${dependencyTask._id}`,
@@ -446,6 +472,7 @@ function ProjectWorkspace({ project, onBack }) {
             setSavingDependencies(false)
         }
     }
+
 
     return (
         <section className="workspace-page">
@@ -767,6 +794,7 @@ function ProjectWorkspace({ project, onBack }) {
                                     <input
                                         id="task-due-date"
                                         type="date"
+                                        min={minDueDate}
                                         value={form.dueDate}
                                         onChange={(event) =>
                                             setForm({
