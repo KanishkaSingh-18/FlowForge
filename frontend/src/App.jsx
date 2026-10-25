@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import axiosInstance from './api/axiosInstance'
 import Login from './pages/Login'
@@ -22,7 +22,13 @@ const EMPTY_METRICS = {
 }
 
 function Dashboard() {
-  const [activePage, setActivePage] = useState('Dashboard')
+  const [activePage, setActivePage] = useState(() => {
+    const savedPage = sessionStorage.getItem('flowforge_active_page')
+
+    return navigation.some((item) => item.label === savedPage)
+      ? savedPage
+      : 'Dashboard'
+  })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(false)
@@ -39,6 +45,15 @@ function Dashboard() {
 
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+
+  const changeActivePage = (page) => {
+    sessionStorage.setItem('flowforge_active_page', page)
+    setActivePage(page)
+  }
+
+  useEffect(() => {
+    sessionStorage.setItem('flowforge_active_page', activePage)
+  }, [activePage])
 
   const fetchProjects = async () => {
     setProjectsLoading(true)
@@ -122,6 +137,7 @@ function Dashboard() {
   const handleLogout = async () => {
     try {
       await logout()
+      sessionStorage.removeItem('flowforge_active_page')
       navigate('/login', { replace: true })
     } catch (error) {
       console.error('Logout failed:', error)
@@ -178,14 +194,14 @@ function Dashboard() {
   }
 
   const openProjects = () => {
-    setActivePage('Projects')
+    changeActivePage('Projects')
     setSidebarOpen(false)
     setNotice('')
     setProjectError('')
   }
 
   const openProjectFromMyWork = (projectId) => {
-    setActivePage('Projects')
+    changeActivePage('Projects')
     setSidebarOpen(false)
     setNotice('')
     setProjectError('')
@@ -241,7 +257,7 @@ function Dashboard() {
           className="brand"
           type="button"
           onClick={() => {
-            setActivePage('Dashboard')
+            changeActivePage('Dashboard')
             setSidebarOpen(false)
           }}
         >
@@ -270,7 +286,7 @@ function Dashboard() {
               className={`nav-item ${activePage === item.label ? 'nav-item-active' : ''
                 }`}
               onClick={() => {
-                setActivePage(item.label)
+                changeActivePage(item.label)
                 setSidebarOpen(false)
                 setNotice('')
                 setProjectError('')
@@ -507,7 +523,7 @@ function Dashboard() {
                             className="primary-button"
                             type="button"
                             onClick={() => {
-                              setActivePage('Projects')
+                              changeActivePage('Projects')
                               setShowProjectForm(true)
                             }}
                           >
@@ -521,7 +537,13 @@ function Dashboard() {
                               type="button"
                               className="dashboard-project-item"
                               key={project._id}
-                              onClick={openProjects}
+                              onClick={() => {
+                                changeActivePage('Projects')
+                                setSidebarOpen(false)
+                                navigate('/', {
+                                  state: { openProjectId: project._id },
+                                })
+                              }}
                             >
                               <span className="project-mini-icon">◫</span>
                               <span className="dashboard-project-copy">
@@ -605,7 +627,7 @@ function Dashboard() {
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={() => setActivePage('Dashboard')}
+                    onClick={() => changeActivePage('Dashboard')}
                   >
                     Back to dashboard
                   </button>

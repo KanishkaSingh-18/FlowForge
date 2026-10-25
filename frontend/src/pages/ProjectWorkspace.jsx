@@ -1,5 +1,4 @@
-
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import axiosInstance from '../api/axiosInstance'
 import { useAuth } from '../context/AuthContext'
 import './ProjectWorkspace.css'
@@ -120,6 +119,7 @@ function formatActivityDate(date) {
 
 function ProjectWorkspace({ project, onBack }) {
     const { user } = useAuth()
+    const taskFormRef = useRef(null)
     const currentUserId = getId(user?._id || user?.id)
     const projectOwnerId = getId(project.owner)
     const isOwner =
@@ -191,7 +191,6 @@ function ProjectWorkspace({ project, onBack }) {
         loadWorkspace()
     }, [loadWorkspace])
 
-    // Fetch the latest activity when the tab opens or Refresh is clicked.
     useEffect(() => {
         if (activeTab !== 'Activity') return
 
@@ -233,6 +232,15 @@ function ProjectWorkspace({ project, onBack }) {
     useEffect(() => {
         setMembers(project.members || [])
     }, [project.members, project._id])
+
+    useEffect(() => {
+        if (showForm && activeTab === 'Tasks') {
+            taskFormRef.current?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+            })
+        }
+    }, [showForm, activeTab])
 
     const filteredTasks = useMemo(() => {
         switch (filter) {
@@ -459,8 +467,8 @@ function ProjectWorkspace({ project, onBack }) {
                     </p>
                     <span
                         className={`project-type-badge ${isTeamProject
-                                ? 'project-type-team'
-                                : 'project-type-solo'
+                            ? 'project-type-team'
+                            : 'project-type-solo'
                             }`}
                     >
                         {isTeamProject ? 'Team project' : 'Solo project'}
@@ -473,8 +481,15 @@ function ProjectWorkspace({ project, onBack }) {
                         type="button"
                         onClick={() => {
                             setFormError('')
-                            setShowForm((current) => !current)
-                            setActiveTab('Tasks')
+                            setShowForm((current) => {
+                                const shouldOpen = !current
+
+                                if (shouldOpen) {
+                                    setActiveTab('Tasks')
+                                }
+
+                                return shouldOpen
+                            })
                         }}
                     >
                         {showForm ? 'Cancel' : '+ New task'}
@@ -528,8 +543,8 @@ function ProjectWorkspace({ project, onBack }) {
                                     </div>
                                     <span
                                         className={`workspace-member-role ${getMemberRole(member) === 'owner'
-                                                ? 'owner'
-                                                : ''
+                                            ? 'owner'
+                                            : ''
                                             }`}
                                     >
                                         {getMemberRole(member) === 'owner'
@@ -681,6 +696,7 @@ function ProjectWorkspace({ project, onBack }) {
                 <>
                     {isOwner && showForm && (
                         <form
+                            ref={taskFormRef}
                             className="workspace-form"
                             onSubmit={handleCreateTask}
                         >
@@ -879,11 +895,20 @@ function ProjectWorkspace({ project, onBack }) {
                                             <div className="workspace-task-title-row">
                                                 <h3>{task.title}</h3>
 
-                                                {task.isBlocked && (
+                                                {task.status === 'Done' &&
+                                                    task.isBlocked &&
+                                                    task.blockedBy?.length > 0 ? (
+                                                    <span
+                                                        className="workspace-badge needs-review"
+                                                        title="A prerequisite is unfinished"
+                                                    >
+                                                        ⚠ Needs review
+                                                    </span>
+                                                ) : task.isBlocked ? (
                                                     <span className="workspace-badge blocked">
                                                         Blocked
                                                     </span>
-                                                )}
+                                                ) : null}
 
                                                 {task.isReadyToStart && (
                                                     <span className="workspace-badge ready">
@@ -904,19 +929,28 @@ function ProjectWorkspace({ project, onBack }) {
                                                 </p>
                                             )}
 
-                                            {task.isBlocked &&
-                                                task.blockedBy?.length > 0 && (
-                                                    <div className="workspace-blocked-detail">
-                                                        <strong>Waiting for:</strong>
-                                                        <ul>
-                                                            {task.blockedBy.map((item) => (
-                                                                <li key={item._id}>
-                                                                    {item.title} ({item.status})
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
+                                            {task.isBlocked && task.blockedBy?.length > 0 && (
+                                                <div className="workspace-blocked-detail">
+                                                    <strong>
+                                                        {task.status === 'Done'
+                                                            ? 'Prerequisites needing review:'
+                                                            : 'Waiting for:'}
+                                                    </strong>
+                                                    <ul>
+                                                        {task.blockedBy.map((item) => (
+                                                            <li key={item._id}>
+                                                                {item.title} ({item.status})
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                    {task.status === 'Done' && (
+                                                        <p>
+                                                            This task remains completed. Review it because one
+                                                            or more prerequisites are unfinished.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             <div className="workspace-task-meta">
                                                 <span

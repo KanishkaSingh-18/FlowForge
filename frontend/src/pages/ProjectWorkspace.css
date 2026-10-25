@@ -882,3 +882,13 @@
         font-size: 12px;
     }
 }
+
+.workspace-badge.needs-review {
+    background: #fff4e5;
+    color: #92400e;
+    border: 1px solid #f5d08a;
+}
+
+.workspace-form {
+    scroll-margin-top: 24px;
+}

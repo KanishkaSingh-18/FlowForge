@@ -242,11 +242,8 @@ export const getProjectTasks = async (req, res) => {
             );
 
             const isBlocked =
-                task.status !== "Done" &&
-                (
-                    task.manuallyBlocked ||
-                    unfinishedDependencies.length > 0
-                );
+                task.manuallyBlocked ||
+                unfinishedDependencies.length > 0;
 
             const isReadyToStart =
                 task.status === "Todo" &&
@@ -338,11 +335,8 @@ export const getProjectDashboard = async (req, res) => {
             );
 
             const isBlocked =
-                task.status !== "Done" &&
-                (
-                    task.manuallyBlocked ||
-                    unfinishedDependencies.length > 0
-                );
+                task.manuallyBlocked ||
+                unfinishedDependencies.length > 0;
 
             const isReadyToStart =
                 task.status === "Todo" &&
