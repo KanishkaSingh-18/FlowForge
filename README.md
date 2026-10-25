@@ -21,37 +21,46 @@ FlowForge combines project management with dependency-aware task tracking to mak
 ## Key Features
 
 ### Authentication and Access Control
+
 - User registration, login, and logout.
 - JWT-based authentication using HTTP-only cookies.
 - Protected resources and project membership checks.
 
 ### Project Management
+
 - Create and manage projects.
 - Support personal and team projects.
 - Manage project members and roles.
 
 ### Task Management
+
 - Create and update project tasks.
 - Assign tasks to users.
 - Set task status, priority, and due dates.
 - Define dependencies between tasks.
 
 ### Project Dependency Intelligence
+
 - Identify tasks blocked by unfinished prerequisites.
 - Determine which tasks are ready to start.
 - Track overdue tasks.
 - Prevent task completion while prerequisites remain unfinished.
 
+For example, if Task B depends on Task A, Task B remains blocked until Task A is completed. This helps users identify the work that needs attention before they can make further progress.
+
 ### My Work Dashboard
+
 - View tasks assigned to the current user across projects.
 - Filter tasks by status and conditions such as blocked or overdue.
 - Navigate to the corresponding project workspace.
 
 ### Project Activity
+
 - View recorded project activity and related task information.
 - Refresh the activity feed to retrieve recent entries.
 
 ### Dashboard and Progress Tracking
+
 - View project and task summaries.
 - Monitor completion progress.
 - Identify outstanding work and blockers.
@@ -69,7 +78,7 @@ FlowForge combines project management with dependency-aware task tracking to mak
 | Database | MongoDB, Mongoose |
 | Authentication | bcrypt, JSON Web Tokens, HTTP-only cookies |
 | Version control | Git, GitHub |
-| Deployment target | Vercel, Render, MongoDB Atlas |
+| Deployment | Vercel, Render, MongoDB Atlas |
 
 ## Architecture
 
@@ -116,6 +125,7 @@ FlowForge/
 │   ├── src/
 │   ├── public/
 │   ├── vite.config.js
+│   ├── vercel.json
 │   └── package.json
 ├── .gitignore
 └── README.md
@@ -138,7 +148,7 @@ cd FlowForge
 
 ### 2. Configure the backend
 
-Create `backend/.env`:
+Create a `.env` file inside the `backend` directory.
 
 ```env
 PORT=5000
@@ -152,6 +162,8 @@ Replace the example values with your own configuration. Never commit real creden
 
 ### 3. Install and start the backend
 
+From the repository root, run:
+
 ```bash
 cd backend
 npm install
@@ -160,9 +172,17 @@ npm run dev
 
 The backend uses port `5000` when no other port is configured.
 
+Keep this terminal running while you use the application.
+
 ### 4. Configure the frontend
 
-Create `frontend/.env`:
+Open a second terminal in the directory where you cloned the repository, then run:
+
+```bash
+cd FlowForge/frontend
+```
+
+Create a `.env` file inside the `frontend` directory containing:
 
 ```env
 VITE_API_URL=http://localhost:5000
@@ -172,10 +192,9 @@ This variable specifies the backend API base URL.
 
 ### 5. Install and start the frontend
 
-Open a second terminal:
+From the `frontend` directory, run:
 
 ```bash
-cd FlowForge/frontend
 npm install
 npm run dev
 ```
@@ -184,7 +203,7 @@ Open the local URL printed by Vite, normally `http://localhost:5173`.
 
 ### 6. Build and lint the frontend
 
-From the `frontend` directory:
+From the `frontend` directory, run:
 
 ```bash
 npm run build
@@ -218,17 +237,16 @@ Production deployment must use appropriate CORS, cookie, and environment setting
 
 ## Deployment
 
-The planned production architecture is:
+FlowForge is deployed using the following services:
 
 - **Frontend:** Vercel
 - **Backend:** Render
 - **Database:** MongoDB Atlas
 
-Deployment and live application links will be added after deployment and end-to-end verification.
+### Project Links
 
 - **GitHub repository:** https://github.com/KanishkaSingh-18/FlowForge
-- **Live application:** Pending deployment
-- **Demo video:** Pending recording
+- **Live application:** https://flow-forge-one-teal.vercel.app/
 
 ## Future Scope
 
