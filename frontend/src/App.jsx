@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import axiosInstance from './api/axiosInstance'
 import Login from './pages/Login'
@@ -7,12 +14,13 @@ import Signup from './pages/Signup'
 import ProtectedRoute from './components/ProtectedRoute'
 import Projects from './pages/Projects'
 import MyWork from './pages/MyWork'
+import ProjectWorkspace from './pages/ProjectWorkspace'
 import './App.css'
 
 const navigation = [
-  { label: 'Dashboard', icon: '▦' },
-  { label: 'Projects', icon: '◫' },
-  { label: 'My Work', icon: '☑' },
+  { label: 'Dashboard', icon: '▦', path: '/' },
+  { label: 'Projects', icon: '◫', path: '/projects' },
+  { label: 'My Work', icon: '☑', path: '/my-work' },
 ]
 
 const EMPTY_METRICS = {
@@ -22,13 +30,6 @@ const EMPTY_METRICS = {
 }
 
 function Dashboard() {
-  const [activePage, setActivePage] = useState(() => {
-    const savedPage = sessionStorage.getItem('flowforge_active_page')
-
-    return navigation.some((item) => item.label === savedPage)
-      ? savedPage
-      : 'Dashboard'
-  })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(false)
@@ -45,15 +46,31 @@ function Dashboard() {
 
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { projectId } = useParams()
+
+  const isProjectWorkspace = Boolean(projectId)
+
+  const activePage = isProjectWorkspace
+    ? 'Projects'
+    : location.pathname === '/projects'
+      ? 'Projects'
+      : location.pathname === '/my-work'
+        ? 'My Work'
+        : location.pathname === '/activity'
+          ? 'Activity'
+          : 'Dashboard'
 
   const changeActivePage = (page) => {
-    sessionStorage.setItem('flowforge_active_page', page)
-    setActivePage(page)
-  }
+    const routes = {
+      Dashboard: '/',
+      Projects: '/projects',
+      'My Work': '/my-work',
+      Activity: '/activity',
+    }
 
-  useEffect(() => {
-    sessionStorage.setItem('flowforge_active_page', activePage)
-  }, [activePage])
+    navigate(routes[page] || '/')
+  }
 
   const fetchProjects = async () => {
     setProjectsLoading(true)
@@ -137,7 +154,6 @@ function Dashboard() {
   const handleLogout = async () => {
     try {
       await logout()
-      sessionStorage.removeItem('flowforge_active_page')
       navigate('/login', { replace: true })
     } catch (error) {
       console.error('Logout failed:', error)
@@ -194,18 +210,17 @@ function Dashboard() {
   }
 
   const openProjects = () => {
-    changeActivePage('Projects')
+    navigate('/projects')
     setSidebarOpen(false)
     setNotice('')
     setProjectError('')
   }
 
-  const openProjectFromMyWork = (projectId) => {
-    changeActivePage('Projects')
+  const openProjectFromMyWork = (id) => {
     setSidebarOpen(false)
     setNotice('')
     setProjectError('')
-    navigate(`/`, { state: { openProjectId: projectId } })
+    navigate(`/projects/${id}`)
   }
 
   const initials = (user?.name || 'FF')
@@ -257,7 +272,7 @@ function Dashboard() {
           className="brand"
           type="button"
           onClick={() => {
-            changeActivePage('Dashboard')
+            navigate('/')
             setSidebarOpen(false)
           }}
         >
@@ -286,12 +301,14 @@ function Dashboard() {
               className={`nav-item ${activePage === item.label ? 'nav-item-active' : ''
                 }`}
               onClick={() => {
-                changeActivePage(item.label)
+                navigate(item.path)
                 setSidebarOpen(false)
                 setNotice('')
                 setProjectError('')
 
-                if (item.label === 'Projects') fetchProjects()
+                if (item.label === 'Projects') {
+                  fetchProjects()
+                }
               }}
             >
               <span className="nav-icon">{item.icon}</span>
@@ -336,7 +353,10 @@ function Dashboard() {
 
             <span className="breadcrumb-muted">Workspace</span>
             <span className="breadcrumb-divider">/</span>
-            <span className="breadcrumb-current">{activePage}</span>
+            <span className="breadcrumb-current">
+              {activePage}
+              {isProjectWorkspace ? ' / Project workspace' : ''}
+            </span>
           </div>
 
           <div className="topbar-right">
@@ -358,7 +378,9 @@ function Dashboard() {
         </header>
 
         <div className="page-content">
-          {activePage === 'Projects' ? (
+          {isProjectWorkspace ? (
+            <ProjectWorkspaceRoute />
+          ) : activePage === 'Projects' ? (
             <Projects />
           ) : activePage === 'My Work' ? (
             <MyWork onOpenProject={openProjectFromMyWork} />
@@ -523,7 +545,7 @@ function Dashboard() {
                             className="primary-button"
                             type="button"
                             onClick={() => {
-                              changeActivePage('Projects')
+                              navigate('/projects')
                               setShowProjectForm(true)
                             }}
                           >
@@ -538,18 +560,16 @@ function Dashboard() {
                               className="dashboard-project-item"
                               key={project._id}
                               onClick={() => {
-                                changeActivePage('Projects')
                                 setSidebarOpen(false)
-                                navigate('/', {
-                                  state: { openProjectId: project._id },
-                                })
+                                navigate(`/projects/${project._id}`)
                               }}
                             >
                               <span className="project-mini-icon">◫</span>
                               <span className="dashboard-project-copy">
                                 <strong>{project.name}</strong>
                                 <span>
-                                  {project.description || 'No description added'}
+                                  {project.description ||
+                                    'No description added'}
                                 </span>
                               </span>
                               <span className="project-item-arrow">→</span>
@@ -627,7 +647,7 @@ function Dashboard() {
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={() => changeActivePage('Dashboard')}
+                    onClick={() => navigate('/')}
                   >
                     Back to dashboard
                   </button>
@@ -641,6 +661,78 @@ function Dashboard() {
   )
 }
 
+function ProjectWorkspaceRoute() {
+  const { projectId } = useParams()
+  const navigate = useNavigate()
+  const [project, setProject] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchProject = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const response = await axiosInstance.get(`/projects/${projectId}`)
+        const projectData = response.data.project || response.data
+
+        if (!cancelled) {
+          setProject(projectData)
+        }
+      } catch (requestError) {
+        if (!cancelled) {
+          setError(
+            requestError.response?.data?.message ||
+            'Unable to load this project.',
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchProject()
+
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
+
+  if (loading) {
+    return <div className="page-content">Loading project…</div>
+  }
+
+  if (error || !project) {
+    return (
+      <div className="page-content">
+        <div className="projects-error" role="alert">
+          {error || 'Project not found.'}
+        </div>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => navigate('/projects')}
+        >
+          Back to projects
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <ProjectWorkspace
+      key={projectId}
+      project={project}
+      onBack={() => navigate('/projects')}
+    />
+  )
+}
+
 function App() {
   return (
     <Routes>
@@ -649,6 +741,10 @@ function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/projects" element={<Dashboard />} />
+        <Route path="/projects/:projectId" element={<Dashboard />} />
+        <Route path="/my-work" element={<Dashboard />} />
+        <Route path="/activity" element={<Dashboard />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

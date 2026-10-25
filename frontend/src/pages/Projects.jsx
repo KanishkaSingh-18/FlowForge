@@ -1,21 +1,20 @@
+
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import axiosInstance from '../api/axiosInstance'
-import ProjectWorkspace from './ProjectWorkspace'
 import './Projects.css'
 
 function Projects() {
     const { user } = useAuth()
-    const location = useLocation()
     const navigate = useNavigate()
+
     const [projects, setProjects] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [showForm, setShowForm] = useState(false)
     const [saving, setSaving] = useState(false)
     const [editingId, setEditingId] = useState(null)
-    const [selectedProject, setSelectedProject] = useState(null)
     const [form, setForm] = useState({
         name: '',
         description: '',
@@ -46,21 +45,6 @@ function Projects() {
         loadProjects()
     }, [])
 
-    useEffect(() => {
-        const projectId = location.state?.openProjectId
-
-        if (!projectId || projects.length === 0) return
-
-        const project = projects.find(
-            (item) => item._id === projectId,
-        )
-
-        if (project) {
-            openDetails(project)
-            navigate(location.pathname, { replace: true, state: null })
-        }
-    }, [location.state, location.pathname, navigate, projects])
-
     const openCreateForm = () => {
         setForm({ name: '', description: '', type: 'solo' })
         setEditingId(null)
@@ -81,6 +65,7 @@ function Projects() {
 
     const closeForm = () => {
         if (saving) return
+
         setShowForm(false)
         setEditingId(null)
         setActionError('')
@@ -135,12 +120,6 @@ function Projects() {
                             : project,
                     ),
                 )
-
-                setSelectedProject((current) =>
-                    current?._id === editingId
-                        ? { ...current, ...updatedProject }
-                        : current,
-                )
             } else {
                 const response = await axiosInstance.post('/projects', {
                     name,
@@ -167,24 +146,9 @@ function Projects() {
         }
     }
 
-    const openDetails = async (project) => {
-        setActionError('')
-        setSelectedProject(project)
-
-        try {
-            const response = await axiosInstance.get(
-                `/projects/${project._id}`,
-            )
-
-            if (response.data.project) {
-                setSelectedProject(response.data.project)
-            }
-        } catch (err) {
-            setActionError(
-                err.response?.data?.message ||
-                'Unable to refresh project details.',
-            )
-        }
+    // Project workspaces are opened through their own URL.
+    const openDetails = (project) => {
+        navigate(`/projects/${project._id}`)
     }
 
     const handleDelete = async (projectId) => {
@@ -225,18 +189,6 @@ function Projects() {
         typeof project.owner === 'object'
             ? project.owner?._id
             : project.owner
-
-    if (selectedProject) {
-        return (
-            <ProjectWorkspace
-                project={selectedProject}
-                onBack={() => {
-                    setSelectedProject(null)
-                    setActionError('')
-                }}
-            />
-        )
-    }
 
     return (
         <section className="projects-page">
@@ -332,8 +284,8 @@ function Projects() {
                                     <div className="project-card-top-actions">
                                         <span
                                             className={`project-type-badge ${project.type === 'team'
-                                                ? 'project-type-team'
-                                                : 'project-type-solo'
+                                                    ? 'project-type-team'
+                                                    : 'project-type-solo'
                                                 }`}
                                         >
                                             {project.type === 'team'
