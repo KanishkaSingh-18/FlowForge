@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import axiosInstance from '../api/axiosInstance'
 import ProjectWorkspace from './ProjectWorkspace'
 import './Projects.css'
 
 function Projects() {
+    const { user } = useAuth()
+    const location = useLocation()
+    const navigate = useNavigate()
     const [projects, setProjects] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -40,6 +45,21 @@ function Projects() {
     useEffect(() => {
         loadProjects()
     }, [])
+
+    useEffect(() => {
+        const projectId = location.state?.openProjectId
+
+        if (!projectId || projects.length === 0) return
+
+        const project = projects.find(
+            (item) => item._id === projectId,
+        )
+
+        if (project) {
+            openDetails(project)
+            navigate(location.pathname, { replace: true, state: null })
+        }
+    }, [location.state, location.pathname, navigate, projects])
 
     const openCreateForm = () => {
         setForm({ name: '', description: '', type: 'solo' })
@@ -301,8 +321,8 @@ function Projects() {
                 <div className="projects-grid">
                     {projects.map((project) => {
                         const isOwner =
-                            getOwnerId(project) ===
-                            (project.owner?._id || project.owner)
+                            getOwnerId(project)?.toString() ===
+                            (user?._id || user?.id)?.toString()
 
                         return (
                             <article className="project-card" key={project._id}>
@@ -312,8 +332,8 @@ function Projects() {
                                     <div className="project-card-top-actions">
                                         <span
                                             className={`project-type-badge ${project.type === 'team'
-                                                    ? 'project-type-team'
-                                                    : 'project-type-solo'
+                                                ? 'project-type-team'
+                                                : 'project-type-solo'
                                                 }`}
                                         >
                                             {project.type === 'team'

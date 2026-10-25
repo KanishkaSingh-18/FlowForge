@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import axiosInstance from './api/axiosInstance'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ProtectedRoute from './components/ProtectedRoute'
 import Projects from './pages/Projects'
+import MyWork from './pages/MyWork'
 import './App.css'
 
 const navigation = [
   { label: 'Dashboard', icon: '▦' },
   { label: 'Projects', icon: '◫' },
-  { label: 'My Tasks', icon: '☑' },
+  { label: 'My Work', icon: '☑' },
   { label: 'Activity', icon: '↗' },
 ]
 
@@ -184,6 +185,14 @@ function Dashboard() {
     setProjectError('')
   }
 
+  const openProjectFromMyWork = (projectId) => {
+    setActivePage('Projects')
+    setSidebarOpen(false)
+    setNotice('')
+    setProjectError('')
+    navigate(`/`, { state: { openProjectId: projectId } })
+  }
+
   const initials = (user?.name || 'FF')
     .split(' ')
     .map((part) => part[0])
@@ -336,6 +345,8 @@ function Dashboard() {
         <div className="page-content">
           {activePage === 'Projects' ? (
             <Projects />
+          ) : activePage === 'My Work' ? (
+            <MyWork onOpenProject={openProjectFromMyWork} />
           ) : (
             <>
               <div className="welcome-row">
