@@ -13,7 +13,6 @@ const navigation = [
   { label: 'Dashboard', icon: '▦' },
   { label: 'Projects', icon: '◫' },
   { label: 'My Work', icon: '☑' },
-  { label: 'Activity', icon: '↗' },
 ]
 
 const EMPTY_METRICS = {

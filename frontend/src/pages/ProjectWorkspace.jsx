@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import axiosInstance from '../api/axiosInstance'
 import { useAuth } from '../context/AuthContext'
@@ -34,12 +35,87 @@ function getMemberRole(member) {
     return member?.role || 'member'
 }
 
+function getActivityAction(action) {
+    const actions = {
+        PROJECT_CREATED: 'created this project',
+        PROJECT_UPDATED: 'updated project details',
+        MEMBER_ADDED: 'added a project member',
+        TASK_CREATED: 'created a task',
+        TASK_UPDATED: 'updated a task',
+        TASK_COMPLETED: 'completed a task',
+        TASK_DELETED: 'deleted a task',
+        DEPENDENCY_UPDATED: 'updated task dependencies',
+    }
+
+    return actions[action] || 'performed a project activity'
+}
+
+function getActivityIcon(action) {
+    const icons = {
+        PROJECT_CREATED: '✦',
+        PROJECT_UPDATED: '✎',
+        MEMBER_ADDED: '+',
+        TASK_CREATED: '+',
+        TASK_UPDATED: '↻',
+        TASK_COMPLETED: '✓',
+        TASK_DELETED: '×',
+        DEPENDENCY_UPDATED: '⇄',
+    }
+
+    return icons[action] || '↗'
+}
+
 function getId(value) {
     if (!value) return ''
 
     return typeof value === 'object'
         ? String(value._id || value.id || '')
         : String(value)
+}
+
+function getActivityDateKey(date) {
+    if (!date) return 'unknown'
+
+    const parsedDate = new Date(date)
+
+    if (Number.isNaN(parsedDate.getTime())) return 'unknown'
+
+    return [
+        parsedDate.getFullYear(),
+        String(parsedDate.getMonth() + 1).padStart(2, '0'),
+        String(parsedDate.getDate()).padStart(2, '0'),
+    ].join('-')
+}
+
+function formatActivityDate(date) {
+    if (!date) return 'Date unavailable'
+
+    const parsedDate = new Date(date)
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return 'Date unavailable'
+    }
+
+    const today = new Date()
+    const yesterday = new Date()
+    yesterday.setDate(today.getDate() - 1)
+
+    if (getActivityDateKey(parsedDate) === getActivityDateKey(today)) {
+        return 'Today'
+    }
+
+    if (
+        getActivityDateKey(parsedDate) ===
+        getActivityDateKey(yesterday)
+    ) {
+        return 'Yesterday'
+    }
+
+    return parsedDate.toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    })
 }
 
 function ProjectWorkspace({ project, onBack }) {
@@ -49,22 +125,31 @@ function ProjectWorkspace({ project, onBack }) {
     const isOwner =
         Boolean(currentUserId) &&
         currentUserId === projectOwnerId
+
     const [tasks, setTasks] = useState([])
     const [summary, setSummary] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+
     const [showForm, setShowForm] = useState(false)
     const [saving, setSaving] = useState(false)
     const [formError, setFormError] = useState('')
+
     const [updatingTaskId, setUpdatingTaskId] = useState(null)
     const [deletingTaskId, setDeletingTaskId] = useState(null)
     const [filter, setFilter] = useState('All')
+
+    const [activeTab, setActiveTab] = useState('Tasks')
+    const [activities, setActivities] = useState([])
+    const [activityLoading, setActivityLoading] = useState(false)
+    const [activityError, setActivityError] = useState('')
+    const [activityRetry, setActivityRetry] = useState(0)
+
     const [dependencyTask, setDependencyTask] = useState(null)
     const [selectedDependencies, setSelectedDependencies] = useState([])
     const [savingDependencies, setSavingDependencies] = useState(false)
     const [dependencyError, setDependencyError] = useState('')
 
-    // Team member management
     const [members, setMembers] = useState(project.members || [])
     const [memberEmail, setMemberEmail] = useState('')
     const [addingMember, setAddingMember] = useState(false)
@@ -106,6 +191,45 @@ function ProjectWorkspace({ project, onBack }) {
         loadWorkspace()
     }, [loadWorkspace])
 
+    // Fetch the latest activity when the tab opens or Refresh is clicked.
+    useEffect(() => {
+        if (activeTab !== 'Activity') return
+
+        let cancelled = false
+
+        const loadActivities = async () => {
+            setActivityLoading(true)
+            setActivityError('')
+
+            try {
+                const response = await axiosInstance.get(
+                    `/projects/${project._id}/activities`,
+                )
+
+                if (!cancelled) {
+                    setActivities(response.data.activities || [])
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setActivityError(
+                        err.response?.data?.message ||
+                        'Unable to load project activity. Please try again.',
+                    )
+                }
+            } finally {
+                if (!cancelled) {
+                    setActivityLoading(false)
+                }
+            }
+        }
+
+        loadActivities()
+
+        return () => {
+            cancelled = true
+        }
+    }, [activeTab, project._id, activityRetry])
+
     useEffect(() => {
         setMembers(project.members || [])
     }, [project.members, project._id])
@@ -126,6 +250,28 @@ function ProjectWorkspace({ project, onBack }) {
                 return tasks
         }
     }, [tasks, filter])
+
+    // Group activities by calendar date while preserving their existing order.
+    const groupedActivities = useMemo(() => {
+        const groups = []
+
+        activities.forEach((activity) => {
+            const dateKey = getActivityDateKey(activity.createdAt)
+            const lastGroup = groups[groups.length - 1]
+
+            if (!lastGroup || lastGroup.dateKey !== dateKey) {
+                groups.push({
+                    dateKey,
+                    label: formatActivityDate(activity.createdAt),
+                    items: [activity],
+                })
+            } else {
+                lastGroup.items.push(activity)
+            }
+        })
+
+        return groups
+    }, [activities])
 
     const handleAddMember = async (event) => {
         event.preventDefault()
@@ -153,7 +299,6 @@ function ProjectWorkspace({ project, onBack }) {
             if (returnedMembers) {
                 setMembers(returnedMembers)
             } else {
-                // Refresh the project to get the updated member list.
                 const projectResponse = await axiosInstance.get(
                     `/projects/${project._id}`,
                 )
@@ -314,8 +459,8 @@ function ProjectWorkspace({ project, onBack }) {
                     </p>
                     <span
                         className={`project-type-badge ${isTeamProject
-                            ? 'project-type-team'
-                            : 'project-type-solo'
+                                ? 'project-type-team'
+                                : 'project-type-solo'
                             }`}
                     >
                         {isTeamProject ? 'Team project' : 'Solo project'}
@@ -329,6 +474,7 @@ function ProjectWorkspace({ project, onBack }) {
                         onClick={() => {
                             setFormError('')
                             setShowForm((current) => !current)
+                            setActiveTab('Tasks')
                         }}
                     >
                         {showForm ? 'Cancel' : '+ New task'}
@@ -349,7 +495,8 @@ function ProjectWorkspace({ project, onBack }) {
                             </p>
                         </div>
                         <span className="workspace-members-count">
-                            {members.length} {members.length === 1 ? 'member' : 'members'}
+                            {members.length}{' '}
+                            {members.length === 1 ? 'member' : 'members'}
                         </span>
                     </div>
 
@@ -381,8 +528,8 @@ function ProjectWorkspace({ project, onBack }) {
                                     </div>
                                     <span
                                         className={`workspace-member-role ${getMemberRole(member) === 'owner'
-                                            ? 'owner'
-                                            : ''
+                                                ? 'owner'
+                                                : ''
                                             }`}
                                     >
                                         {getMemberRole(member) === 'owner'
@@ -502,368 +649,570 @@ function ProjectWorkspace({ project, onBack }) {
                 </div>
             )}
 
-            {isOwner && showForm && (
-                <form className="workspace-form" onSubmit={handleCreateTask}>
-                    <h3>Create a task</h3>
+            <div
+                className="workspace-tabs"
+                role="tablist"
+                aria-label="Project workspace"
+            >
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'Tasks'}
+                    className={`workspace-tab ${activeTab === 'Tasks' ? 'active' : ''
+                        }`}
+                    onClick={() => setActiveTab('Tasks')}
+                >
+                    Tasks
+                </button>
 
-                    <label htmlFor="task-title">Task title *</label>
-                    <input
-                        id="task-title"
-                        value={form.title}
-                        onChange={(event) =>
-                            setForm({ ...form, title: event.target.value })
-                        }
-                        maxLength={150}
-                        placeholder="e.g. Design the landing page"
-                        required
-                    />
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'Activity'}
+                    className={`workspace-tab ${activeTab === 'Activity' ? 'active' : ''
+                        }`}
+                    onClick={() => setActiveTab('Activity')}
+                >
+                    Activity
+                </button>
+            </div>
 
-                    <label htmlFor="task-description">Description</label>
-                    <textarea
-                        id="task-description"
-                        value={form.description}
-                        onChange={(event) =>
-                            setForm({
-                                ...form,
-                                description: event.target.value,
-                            })
-                        }
-                        maxLength={2000}
-                        rows={3}
-                        placeholder="What needs to be done?"
-                    />
+            {activeTab === 'Tasks' ? (
+                <>
+                    {isOwner && showForm && (
+                        <form
+                            className="workspace-form"
+                            onSubmit={handleCreateTask}
+                        >
+                            <h3>Create a task</h3>
 
-                    <div className="workspace-form-row">
-                        <div>
-                            <label htmlFor="task-priority">Priority</label>
-                            <select
-                                id="task-priority"
-                                value={form.priority}
+                            <label htmlFor="task-title">Task title *</label>
+                            <input
+                                id="task-title"
+                                value={form.title}
                                 onChange={(event) =>
                                     setForm({
                                         ...form,
-                                        priority: event.target.value,
+                                        title: event.target.value,
                                     })
                                 }
+                                maxLength={150}
+                                placeholder="e.g. Design the landing page"
+                                required
+                            />
+
+                            <label htmlFor="task-description">
+                                Description
+                            </label>
+                            <textarea
+                                id="task-description"
+                                value={form.description}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        description: event.target.value,
+                                    })
+                                }
+                                maxLength={2000}
+                                rows={3}
+                                placeholder="What needs to be done?"
+                            />
+
+                            <div className="workspace-form-row">
+                                <div>
+                                    <label htmlFor="task-priority">
+                                        Priority
+                                    </label>
+                                    <select
+                                        id="task-priority"
+                                        value={form.priority}
+                                        onChange={(event) =>
+                                            setForm({
+                                                ...form,
+                                                priority: event.target.value,
+                                            })
+                                        }
+                                    >
+                                        {PRIORITIES.map((priority) => (
+                                            <option
+                                                key={priority}
+                                                value={priority}
+                                            >
+                                                {priority}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="task-due-date">
+                                        Due date
+                                    </label>
+                                    <input
+                                        id="task-due-date"
+                                        type="date"
+                                        value={form.dueDate}
+                                        onChange={(event) =>
+                                            setForm({
+                                                ...form,
+                                                dueDate: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </div>
+                            </div>
+
+                            {formError && (
+                                <p className="workspace-error" role="alert">
+                                    {formError}
+                                </p>
+                            )}
+
+                            <button
+                                className="projects-create-button"
+                                type="submit"
+                                disabled={saving}
                             >
-                                {PRIORITIES.map((priority) => (
-                                    <option key={priority} value={priority}>
-                                        {priority}
+                                {saving ? 'Creating...' : 'Create task'}
+                            </button>
+                        </form>
+                    )}
+
+                    {error && (
+                        <div className="projects-error" role="alert">
+                            {error}
+                            <button
+                                type="button"
+                                onClick={() => setError('')}
+                                aria-label="Dismiss error"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="workspace-task-toolbar">
+                        <div>
+                            <h3>Project tasks</h3>
+                            <p>
+                                Track progress and manage dependencies between tasks.
+                            </p>
+                        </div>
+
+                        <label className="workspace-filter">
+                            <span>Filter</span>
+                            <select
+                                value={filter}
+                                onChange={(event) => setFilter(event.target.value)}
+                            >
+                                {[
+                                    'All',
+                                    'Todo',
+                                    'In Progress',
+                                    'Done',
+                                    'Blocked',
+                                    'Overdue',
+                                ].map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
                                     </option>
                                 ))}
                             </select>
-                        </div>
-
-                        <div>
-                            <label htmlFor="task-due-date">Due date</label>
-                            <input
-                                id="task-due-date"
-                                type="date"
-                                value={form.dueDate}
-                                onChange={(event) =>
-                                    setForm({
-                                        ...form,
-                                        dueDate: event.target.value,
-                                    })
-                                }
-                            />
-                        </div>
+                        </label>
                     </div>
 
-                    {formError && (
-                        <p className="workspace-error" role="alert">
-                            {formError}
-                        </p>
+                    {loading ? (
+                        <div className="projects-state">
+                            <div className="projects-spinner" />
+                            <p>Loading tasks...</p>
+                        </div>
+                    ) : tasks.length === 0 ? (
+                        <div className="projects-empty workspace-empty">
+                            <div className="projects-empty-art">
+                                <span>✓</span>
+                            </div>
+                            <h3>No tasks yet</h3>
+                            <p>
+                                Create your first task to start tracking work in this
+                                project.
+                            </p>
+                            {isOwner && (
+                                <button
+                                    type="button"
+                                    className="projects-create-button"
+                                    onClick={() => setShowForm(true)}
+                                >
+                                    + Create your first task
+                                </button>
+                            )}
+                        </div>
+                    ) : filteredTasks.length === 0 ? (
+                        <div className="projects-state">
+                            <h3>No matching tasks</h3>
+                            <p>Try choosing a different filter.</p>
+                            <button
+                                type="button"
+                                className="projects-secondary-button"
+                                onClick={() => setFilter('All')}
+                            >
+                                Show all tasks
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="workspace-task-list">
+                            {filteredTasks.map((task) => {
+                                const assignedUserId = getId(task.assignedTo)
+
+                                const isAssignedToCurrentUser =
+                                    Boolean(currentUserId) &&
+                                    assignedUserId === currentUserId
+
+                                const canChangeStatus =
+                                    isOwner || isAssignedToCurrentUser
+
+                                return (
+                                    <article
+                                        className="workspace-task-card"
+                                        key={task._id}
+                                    >
+                                        <div className="workspace-task-main">
+                                            <div className="workspace-task-title-row">
+                                                <h3>{task.title}</h3>
+
+                                                {task.isBlocked && (
+                                                    <span className="workspace-badge blocked">
+                                                        Blocked
+                                                    </span>
+                                                )}
+
+                                                {task.isReadyToStart && (
+                                                    <span className="workspace-badge ready">
+                                                        Ready to start
+                                                    </span>
+                                                )}
+
+                                                {task.isOverdue && (
+                                                    <span className="workspace-badge overdue">
+                                                        Overdue
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {task.description && (
+                                                <p className="workspace-task-description">
+                                                    {task.description}
+                                                </p>
+                                            )}
+
+                                            {task.isBlocked &&
+                                                task.blockedBy?.length > 0 && (
+                                                    <div className="workspace-blocked-detail">
+                                                        <strong>Waiting for:</strong>
+                                                        <ul>
+                                                            {task.blockedBy.map((item) => (
+                                                                <li key={item._id}>
+                                                                    {item.title} ({item.status})
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                            <div className="workspace-task-meta">
+                                                <span
+                                                    className={`workspace-priority priority-${task.priority?.toLowerCase()}`}
+                                                >
+                                                    {task.priority} priority
+                                                </span>
+                                                <span>
+                                                    Due: {formatDate(task.dueDate)}
+                                                </span>
+                                                <span>
+                                                    Assigned to:{' '}
+                                                    {task.assignedTo?.name ||
+                                                        task.assignedTo?.email ||
+                                                        'Unassigned'}
+                                                </span>
+                                            </div>
+
+                                            <div className="workspace-dependency-summary">
+                                                <strong>Depends on:</strong>{' '}
+                                                {task.dependencies?.length
+                                                    ? task.dependencies
+                                                        .map((dependency) =>
+                                                            typeof dependency === 'object'
+                                                                ? dependency.title
+                                                                : 'Linked task',
+                                                        )
+                                                        .join(', ')
+                                                    : 'No dependencies'}
+                                            </div>
+
+                                            {isOwner && (
+                                                <button
+                                                    type="button"
+                                                    className="workspace-dependency-button"
+                                                    onClick={() =>
+                                                        openDependencyEditor(task)
+                                                    }
+                                                >
+                                                    Manage dependencies
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="workspace-task-actions">
+                                            {isOwner && (
+                                                <label>
+                                                    <span>Assign to</span>
+                                                    <select
+                                                        value={getId(task.assignedTo)}
+                                                        disabled={
+                                                            updatingTaskId === task._id ||
+                                                            deletingTaskId === task._id
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateTask(task, {
+                                                                assignedTo:
+                                                                    event.target.value || null,
+                                                            })
+                                                        }
+                                                    >
+                                                        <option value="">Unassigned</option>
+                                                        {members.map((member) => {
+                                                            const memberUser =
+                                                                getMemberUser(member)
+                                                            const memberId =
+                                                                getId(memberUser)
+
+                                                            if (!memberId) return null
+
+                                                            return (
+                                                                <option
+                                                                    key={memberId}
+                                                                    value={memberId}
+                                                                >
+                                                                    {getMemberName(member)}
+                                                                </option>
+                                                            )
+                                                        })}
+                                                    </select>
+                                                </label>
+                                            )}
+
+                                            <label>
+                                                <span>Status</span>
+                                                <select
+                                                    value={task.status}
+                                                    disabled={
+                                                        !canChangeStatus ||
+                                                        updatingTaskId === task._id ||
+                                                        deletingTaskId === task._id
+                                                    }
+                                                    onChange={(event) =>
+                                                        updateTask(task, {
+                                                            status: event.target.value,
+                                                        })
+                                                    }
+                                                    aria-label={`Status for ${task.title}`}
+                                                >
+                                                    {STATUSES.map((status) => (
+                                                        <option key={status} value={status}>
+                                                            {status}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </label>
+
+                                            {isOwner && (
+                                                <label>
+                                                    <span>Priority</span>
+                                                    <select
+                                                        value={task.priority}
+                                                        disabled={
+                                                            updatingTaskId === task._id ||
+                                                            deletingTaskId === task._id
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateTask(task, {
+                                                                priority: event.target.value,
+                                                            })
+                                                        }
+                                                        aria-label={`Priority for ${task.title}`}
+                                                    >
+                                                        {PRIORITIES.map((priority) => (
+                                                            <option
+                                                                key={priority}
+                                                                value={priority}
+                                                            >
+                                                                {priority}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                            )}
+
+                                            {isOwner && (
+                                                <button
+                                                    className="workspace-delete-button"
+                                                    type="button"
+                                                    disabled={
+                                                        deletingTaskId === task._id ||
+                                                        updatingTaskId === task._id
+                                                    }
+                                                    onClick={() => deleteTask(task)}
+                                                >
+                                                    {deletingTaskId === task._id
+                                                        ? 'Deleting...'
+                                                        : 'Delete'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </article>
+                                )
+                            })}
+                        </div>
                     )}
+                </>
+            ) : (
+                <section className="workspace-activity">
+                    <div className="workspace-activity-heading">
+                        <div>
+                            <span className="projects-eyebrow">
+                                PROJECT HISTORY
+                            </span>
+                            <h3>Recent activity</h3>
+                            <p>
+                                See the latest changes made in this project.
+                            </p>
+                        </div>
 
-                    <button
-                        className="projects-create-button"
-                        type="submit"
-                        disabled={saving}
-                    >
-                        {saving ? 'Creating...' : 'Create task'}
-                    </button>
-                </form>
-            )}
-
-            {error && (
-                <div className="projects-error" role="alert">
-                    {error}
-                    <button
-                        type="button"
-                        onClick={() => setError('')}
-                        aria-label="Dismiss error"
-                    >
-                        ×
-                    </button>
-                </div>
-            )}
-
-            <div className="workspace-task-toolbar">
-                <div>
-                    <h3>Project tasks</h3>
-                    <p>
-                        Track progress and manage dependencies between tasks.
-                    </p>
-                </div>
-
-                <label className="workspace-filter">
-                    <span>Filter</span>
-                    <select
-                        value={filter}
-                        onChange={(event) => setFilter(event.target.value)}
-                    >
-                        {[
-                            'All',
-                            'Todo',
-                            'In Progress',
-                            'Done',
-                            'Blocked',
-                            'Overdue',
-                        ].map((option) => (
-                            <option key={option} value={option}>
-                                {option}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-            </div>
-
-            {loading ? (
-                <div className="projects-state">
-                    <div className="projects-spinner" />
-                    <p>Loading tasks...</p>
-                </div>
-            ) : tasks.length === 0 ? (
-                <div className="projects-empty workspace-empty">
-                    <div className="projects-empty-art">
-                        <span>✓</span>
-                    </div>
-                    <h3>No tasks yet</h3>
-                    <p>
-                        Create your first task to start tracking work in this
-                        project.
-                    </p>
-                    {isOwner && (
                         <button
                             type="button"
-                            className="projects-create-button"
-                            onClick={() => setShowForm(true)}
+                            className="projects-secondary-button"
+                            onClick={() =>
+                                setActivityRetry((current) => current + 1)
+                            }
+                            disabled={activityLoading}
                         >
-                            + Create your first task
+                            {activityLoading ? (
+                                <>
+                                    <span className="workspace-refresh-spinner" />
+                                    Refreshing...
+                                </>
+                            ) : (
+                                <>
+                                    <span aria-hidden="true">↻</span>
+                                    Refresh
+                                </>
+                            )}
                         </button>
-                    )}
-                </div>
-            ) : filteredTasks.length === 0 ? (
-                <div className="projects-state">
-                    <h3>No matching tasks</h3>
-                    <p>Try choosing a different filter.</p>
-                    <button
-                        type="button"
-                        className="projects-secondary-button"
-                        onClick={() => setFilter('All')}
-                    >
-                        Show all tasks
-                    </button>
-                </div>
-            ) : (
-                <div className="workspace-task-list">
-                    {filteredTasks.map((task) => {
-                        const assignedUserId = getId(task.assignedTo)
+                    </div>
 
-                        const isAssignedToCurrentUser =
-                            Boolean(currentUserId) &&
-                            assignedUserId === currentUserId
-
-                        const canChangeStatus =
-                            isOwner || isAssignedToCurrentUser
-
-                        return (
-                            <article
-                                className="workspace-task-card"
-                                key={task._id}
+                    {activityLoading ? (
+                        <div className="projects-state">
+                            <div className="projects-spinner" />
+                            <p>Loading activity...</p>
+                        </div>
+                    ) : activityError ? (
+                        <div className="projects-error" role="alert">
+                            <p>{activityError}</p>
+                            <button
+                                type="button"
+                                className="projects-secondary-button"
+                                onClick={() =>
+                                    setActivityRetry((current) => current + 1)
+                                }
                             >
-                                <div className="workspace-task-main">
-                                    <div className="workspace-task-title-row">
-                                        <h3>{task.title}</h3>
-
-                                        {task.isBlocked && (
-                                            <span className="workspace-badge blocked">
-                                                Blocked
-                                            </span>
-                                        )}
-
-                                        {task.isReadyToStart && (
-                                            <span className="workspace-badge ready">
-                                                Ready to start
-                                            </span>
-                                        )}
-
-                                        {task.isOverdue && (
-                                            <span className="workspace-badge overdue">
-                                                Overdue
-                                            </span>
-                                        )}
+                                Try again
+                            </button>
+                        </div>
+                    ) : activities.length === 0 ? (
+                        <div className="projects-empty workspace-empty">
+                            <div className="projects-empty-art">
+                                <span>↗</span>
+                            </div>
+                            <h3>No activity yet</h3>
+                            <p>
+                                Project changes will appear here as work progresses.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="workspace-activity-list">
+                            {groupedActivities.map((group) => (
+                                <section
+                                    className="workspace-activity-day"
+                                    key={group.dateKey}
+                                >
+                                    <div className="workspace-activity-date">
+                                        <span>{group.label}</span>
                                     </div>
 
-                                    {task.description && (
-                                        <p className="workspace-task-description">
-                                            {task.description}
-                                        </p>
-                                    )}
-
-                                    {task.isBlocked &&
-                                        task.blockedBy?.length > 0 && (
-                                            <div className="workspace-blocked-detail">
-                                                <strong>Waiting for:</strong>
-                                                <ul>
-                                                    {task.blockedBy.map((item) => (
-                                                        <li key={item._id}>
-                                                            {item.title} ({item.status})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                    <div className="workspace-task-meta">
-                                        <span
-                                            className={`workspace-priority priority-${task.priority?.toLowerCase()}`}
-                                        >
-                                            {task.priority} priority
-                                        </span>
-                                        <span>Due: {formatDate(task.dueDate)}</span>
-                                        <span>
-                                            Assigned to:{' '}
-                                            {task.assignedTo?.name ||
-                                                task.assignedTo?.email ||
-                                                'Unassigned'}
-                                        </span>
-                                    </div>
-
-                                    <div className="workspace-dependency-summary">
-                                        <strong>Depends on:</strong>{' '}
-                                        {task.dependencies?.length
-                                            ? task.dependencies
-                                                .map((dependency) =>
-                                                    typeof dependency === 'object'
-                                                        ? dependency.title
-                                                        : 'Linked task',
-                                                )
-                                                .join(', ')
-                                            : 'No dependencies'}
-                                    </div>
-
-                                    {isOwner && (
-                                        <button
-                                            type="button"
-                                            className="workspace-dependency-button"
-                                            onClick={() => openDependencyEditor(task)}
-                                        >
-                                            Manage dependencies
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="workspace-task-actions">
-                                    {isOwner && (
-                                        <label>
-                                            <span>Assign to</span>
-                                            <select
-                                                value={getId(task.assignedTo)}
-                                                disabled={
-                                                    updatingTaskId === task._id ||
-                                                    deletingTaskId === task._id
-                                                }
-                                                onChange={(event) =>
-                                                    updateTask(task, {
-                                                        assignedTo: event.target.value || null,
-                                                    })
-                                                }
+                                    <div className="workspace-activity-timeline">
+                                        {group.items.map((activity) => (
+                                            <article
+                                                className="workspace-activity-item"
+                                                key={activity._id}
                                             >
-                                                <option value="">Unassigned</option>
-                                                {members.map((member) => {
-                                                    const memberUser = getMemberUser(member)
-                                                    const memberId = getId(memberUser)
+                                                <div
+                                                    className={`workspace-activity-marker activity-${(
+                                                        activity.action || 'default'
+                                                    ).toLowerCase()}`}
+                                                    aria-hidden="true"
+                                                >
+                                                    {getActivityIcon(activity.action)}
+                                                </div>
 
-                                                    if (!memberId) return null
+                                                <div className="workspace-activity-card">
+                                                    <div className="workspace-activity-card-heading">
+                                                        <p>
+                                                            <strong>
+                                                                {activity.actor?.name ||
+                                                                    activity.actor?.email ||
+                                                                    'A project member'}
+                                                            </strong>{' '}
+                                                            {getActivityAction(
+                                                                activity.action,
+                                                            )}
+                                                            {activity.task?.title && (
+                                                                <>
+                                                                    {' '}
+                                                                    <strong className="workspace-activity-task-title">
+                                                                        “{activity.task.title}”
+                                                                    </strong>
+                                                                </>
+                                                            )}
+                                                        </p>
 
-                                                    return (
-                                                        <option key={memberId} value={memberId}>
-                                                            {getMemberName(member)}
-                                                        </option>
-                                                    )
-                                                })}
-                                            </select>
-                                        </label>
-                                    )}
-                                    <label>
-                                        <span>Status</span>
-                                        <select
-                                            value={task.status}
-                                            disabled={
-                                                !canChangeStatus ||
-                                                updatingTaskId === task._id ||
-                                                deletingTaskId === task._id
-                                            }
-                                            onChange={(event) =>
-                                                updateTask(task, {
-                                                    status: event.target.value,
-                                                })
-                                            }
-                                            aria-label={`Status for ${task.title}`}
-                                        >
-                                            {STATUSES.map((status) => (
-                                                <option key={status} value={status}>
-                                                    {status}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
+                                                        <time dateTime={activity.createdAt}>
+                                                            {activity.createdAt
+                                                                ? new Date(
+                                                                    activity.createdAt,
+                                                                ).toLocaleTimeString(
+                                                                    undefined,
+                                                                    {
+                                                                        hour: 'numeric',
+                                                                        minute: '2-digit',
+                                                                    },
+                                                                )
+                                                                : 'Time unavailable'}
+                                                        </time>
+                                                    </div>
 
-                                    {isOwner && (
-                                        <label>
-                                            <span>Priority</span>
-                                            <select
-                                                value={task.priority}
-                                                disabled={
-                                                    updatingTaskId === task._id ||
-                                                    deletingTaskId === task._id
-                                                }
-                                                onChange={(event) =>
-                                                    updateTask(task, {
-                                                        priority: event.target.value,
-                                                    })
-                                                }
-                                                aria-label={`Priority for ${task.title}`}
-                                            >
-                                                {PRIORITIES.map((priority) => (
-                                                    <option key={priority} value={priority}>
-                                                        {priority}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
-                                    )}
-
-                                    {isOwner && (
-                                        <button
-                                            className="workspace-delete-button"
-                                            type="button"
-                                            disabled={
-                                                deletingTaskId === task._id ||
-                                                updatingTaskId === task._id
-                                            }
-                                            onClick={() => deleteTask(task)}
-                                        >
-                                            {deletingTaskId === task._id ? 'Deleting...' : 'Delete'}
-                                        </button>
-                                    )}
-                                </div>
-                            </article>
-                        )
-                    })}
-                </div>
+                                                    {activity.details && (
+                                                        <p className="workspace-activity-details">
+                                                            {activity.details}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </article>
+                                        ))}
+                                    </div>
+                                </section>
+                            ))}
+                        </div>
+                    )}
+                </section>
             )}
 
             {isOwner && dependencyTask && (

@@ -225,9 +225,18 @@
 }
 
 .workspace-blocked-detail {
-    margin: 10px 0 0;
-    color: #b42335;
-    font-size: 12px;
+    margin: 12px 0 0;
+    color: #a94a36;
+    font-size: 13px;
+}
+
+.workspace-blocked-detail ul {
+    margin: 6px 0 0;
+    padding-left: 20px;
+}
+
+.workspace-blocked-detail li {
+    margin-top: 4px;
 }
 
 .workspace-task-actions {
@@ -256,49 +265,6 @@
 
 .workspace-empty {
     margin-top: 12px;
-}
-
-@media (max-width: 1000px) {
-    .workspace-stats {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .workspace-task-card {
-        flex-direction: column;
-    }
-
-    .workspace-task-actions {
-        width: 100%;
-        flex-wrap: wrap;
-    }
-}
-
-@media (max-width: 600px) {
-    .workspace-heading {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .workspace-stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .workspace-form {
-        padding: 18px;
-    }
-
-    .workspace-form-row {
-        grid-template-columns: 1fr;
-    }
-
-    .workspace-task-card {
-        padding: 16px;
-    }
-
-    .workspace-task-actions label {
-        flex: 1;
-        min-width: 110px;
-    }
 }
 
 .workspace-progress {
@@ -433,49 +399,13 @@
     font-size: 12px;
 }
 
-.workspace-dependency-help {
-    color: #777b8d;
-    font-size: 12px;
-    line-height: 1.6;
-}
-
-.workspace-blocked-detail {
-    margin-top: 12px;
-    color: #a94a36;
-    font-size: 13px;
-}
-
-.workspace-blocked-detail ul {
-    margin: 6px 0 0;
-    padding-left: 20px;
-}
-
-.workspace-blocked-detail li {
-    margin-top: 4px;
-}
-
-@media (max-width: 640px) {
-    .workspace-task-toolbar {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .workspace-filter {
-        width: 100%;
-    }
-
-    .workspace-progress {
-        padding: 15px;
-    }
-}
-
 .workspace-members {
     margin: 24px 0;
     padding: 22px;
     border: 1px solid #e9e3f5;
     border-radius: 18px;
     background: #fff;
-    box-shadow: 0 5px 20px rgba(65, 45, 110, 0.04);
+    box-shadow: 0 5px 20px rgb(65 45 110 / 4%);
 }
 
 .workspace-members-heading {
@@ -585,7 +515,7 @@
     border-top: 1px solid #eeeaf5;
 }
 
-.workspace-add-member-form > label {
+.workspace-add-member-form>label {
     color: #413957;
     font-size: 12px;
     font-weight: 700;
@@ -634,7 +564,259 @@
     font-weight: 600;
 }
 
-@media (max-width: 560px) {
+.workspace-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e9e8f3;
+}
+
+.workspace-tab {
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #77788c;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.workspace-tab:hover {
+    background: #f5f3ff;
+    color: #6254cb;
+}
+
+.workspace-tab.active {
+    background: #eeeaff;
+    color: #6254cb;
+}
+
+.workspace-activity {
+    margin-top: 8px;
+    padding: 26px;
+    border: 1px solid #e9e5f5;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 5px 24px rgb(48 36 90 / 3%);
+}
+
+.workspace-activity-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.workspace-activity-heading h3 {
+    margin: 8px 0;
+    color: #302a49;
+    font-size: 21px;
+}
+
+.workspace-activity-heading p {
+    margin: 0;
+    color: #77788c;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.workspace-activity-heading .projects-secondary-button {
+    flex-shrink: 0;
+    padding: 11px 18px;
+    border: 1px solid #e1dcf5;
+    border-radius: 11px;
+    background: #fff;
+    color: #6254cb;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.workspace-activity-heading .projects-secondary-button:hover:not(:disabled) {
+    border-color: #c8bdf5;
+    background: #f7f5ff;
+}
+
+.workspace-activity-heading .projects-secondary-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.workspace-activity-list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding-left: 8px;
+}
+
+.workspace-activity-list::before {
+    position: absolute;
+    top: 16px;
+    bottom: 20px;
+    left: 25px;
+    width: 2px;
+    background: #e8e2fa;
+    content: "";
+}
+
+.workspace-activity-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 15px 0;
+    border: 0;
+}
+
+.workspace-activity-marker {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-top: 3px;
+    border: 4px solid #fff;
+    border-radius: 50%;
+    background: #eee9ff;
+    color: #7057d9;
+    box-shadow: 0 0 0 1px #e6defb;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.workspace-activity-content {
+    min-width: 0;
+    flex: 1;
+    padding: 15px 18px;
+    border: 1px solid #eeeaf7;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgb(48 36 90 / 4%);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.workspace-activity-item:hover .workspace-activity-content {
+    border-color: #ded5fa;
+    box-shadow: 0 5px 16px rgb(48 36 90 / 7%);
+}
+
+.workspace-activity-content p {
+    margin: 0;
+    color: #626178;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+.workspace-activity-content p strong {
+    color: #302a49;
+    font-weight: 700;
+}
+
+.workspace-activity-content .workspace-activity-details {
+    margin-top: 5px;
+    color: #858198;
+    font-size: 12px;
+}
+
+.workspace-activity-content time {
+    display: block;
+    margin-top: 9px;
+    color: #9893aa;
+    font-size: 11px;
+}
+
+.workspace-activity>.projects-state {
+    padding: 30px 12px;
+}
+
+.workspace-activity>.projects-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 12px;
+    background: #fff6f6;
+}
+
+.workspace-activity>.projects-error p {
+    margin: 0;
+}
+
+.workspace-activity>.projects-empty {
+    padding: 24px 12px;
+    text-align: center;
+}
+
+@media (max-width: 1000px) {
+    .workspace-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .workspace-task-card {
+        flex-direction: column;
+    }
+
+    .workspace-task-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 640px) {
+    .workspace-task-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .workspace-filter {
+        width: 100%;
+    }
+
+    .workspace-progress {
+        padding: 15px;
+    }
+}
+
+@media (max-width: 600px) {
+    .workspace-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .workspace-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .workspace-form {
+        padding: 18px;
+    }
+
+    .workspace-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .workspace-task-card {
+        padding: 16px;
+    }
+
+    .workspace-task-actions label {
+        flex: 1;
+        min-width: 110px;
+    }
+
     .workspace-members {
         padding: 16px;
     }
@@ -650,5 +832,53 @@
     .workspace-member {
         gap: 9px;
         padding: 10px;
+    }
+
+    .workspace-activity {
+        padding: 16px;
+    }
+
+    .workspace-activity-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .workspace-activity-heading .projects-secondary-button {
+        align-self: flex-start;
+    }
+
+    .workspace-tabs {
+        gap: 5px;
+    }
+
+    .workspace-tab {
+        padding: 9px 13px;
+    }
+
+    .workspace-activity-list {
+        padding-left: 0;
+    }
+
+    .workspace-activity-list::before {
+        left: 17px;
+    }
+
+    .workspace-activity-item {
+        gap: 10px;
+        padding: 12px 0;
+    }
+
+    .workspace-activity-marker {
+        width: 34px;
+        height: 34px;
+    }
+
+    .workspace-activity-content {
+        padding: 12px;
+    }
+
+    .workspace-activity-content p {
+        font-size: 12px;
     }
 }
